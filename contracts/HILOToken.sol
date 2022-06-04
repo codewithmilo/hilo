@@ -49,7 +49,7 @@ contract HILOToken is ERC1155, ERC2981, Ownable, Pausable {
         stepCounts[1] = 0;
     }
 
-    function getPrice(uint tokenId) public view returns (uint price) {
+    function getPrice(uint tokenId) public view returns (uint) {
         if (tokenId == HI) {
             return hiPrice;
         } else if (tokenId == LO) {
@@ -118,13 +118,13 @@ contract HILOToken is ERC1155, ERC2981, Ownable, Pausable {
 
     function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data) internal whenNotPaused override {
         // enforce only transacting with HILO
-        require(from == address(0) || to == address(0), "NonTransferrableToken: non transferrable");
+        // require(from == address(this) || to == address(this), "NonTransferrableToken: non transferrable");
 
-        // ensure the receiver does not have any tokens already
-        if (to != address(0)) {
-            require(balanceOf(to, HI) == 0, "NonTransferrableToken: receiver already has tokens");
-            require(balanceOf(to, LO) == 0, "NonTransferrableToken: receiver already has tokens");
-        }
+        // // ensure the receiver does not have any tokens already
+        // if (to != address(this)) {
+        //     require(balanceOf(to, HI) == 0, "NonTransferrableToken: receiver already has tokens");
+        //     require(balanceOf(to, LO) == 0, "NonTransferrableToken: receiver already has tokens");
+        // }
 
         // enforce the cost
         uint tokenId = ids[0];
@@ -136,7 +136,7 @@ contract HILOToken is ERC1155, ERC2981, Ownable, Pausable {
         }
 
         // end game if the prices converged
-        if (to == address(0) && hiPrice == loPrice) {
+        if (to == address(this) && hiPrice == loPrice) {
             // but add the action first
             addAction(from, tokenId);
 
@@ -148,7 +148,7 @@ contract HILOToken is ERC1155, ERC2981, Ownable, Pausable {
 
     function _afterTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data) internal whenNotPaused override {
         // only do stuff if someone is trading back the token
-        if (to == address(0)) {
+        if (to == address(this)) {
             uint tokenId = ids[0];
             uint count = stepCounts[tokenId];
 
@@ -167,7 +167,7 @@ contract HILOToken is ERC1155, ERC2981, Ownable, Pausable {
 
             // if we need to transfer LO from a HI sale, do that
             if (tokenId == HI) {
-                safeTransferFrom(address(0), from, LO, 1, data);
+                safeTransferFrom(address(this), from, LO, 1, data);
                 console.log("LO transferred from HI sale, recepient:", from);
             }
         }
