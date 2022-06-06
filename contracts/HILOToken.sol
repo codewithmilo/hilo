@@ -3,22 +3,37 @@ pragma solidity ^0.8.0;
 
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import "@openzeppelin/contracts/token/common/ERC2981.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 
-contract HILOToken is ERC1155, ERC2981, Pausable {
+contract HILOToken is ERC1155, Ownable, Pausable {
     uint public constant HI = 0;
     uint public constant LO = 1;
+
+    // the initial prices
+    uint private initialHi;
+    uint private initialLo;
 
     // the up-to-date prices
     uint private hiPrice;
     uint private loPrice;
 
-    // track how many tokens bought before we change the price,
-    // 0 => LO, 1 => HI
-    uint private buysPerStep;
-    mapping(uint => uint) private stepCounts;
+    // locks for tokens at price levels
+    bool private hiLock;
+    bool private loLock;
+
+    // number of buys per price level
+    uint private buyRequiredCount;
+
+    // number of buys until sales are open
+    // keep as a mapping so its easier to update
+    // 0 => HI, 1 => LO
+    mapping(uint => uint) private buyCounts;
+
+    // queue for sales
+    address[] private saleQueue;
+    uint private saleQueueIndex;
 
     struct Action {
         address player;
@@ -36,22 +51,20 @@ contract HILOToken is ERC1155, ERC2981, Pausable {
     event loIncreased(uint previousLoPrice);
     event pricesConverged(address[] winners, uint price);
 
-    constructor(uint initialHi, uint initialLo, uint _buysPerStep) ERC1155("") {
+    constructor(uint _initialHi, uint _initialLo, uint _buyRequiredCount) ERC1155("") {
 
         // set the start prices
-        hiPrice = initialHi;
-        loPrice = initialLo;
-
-        // set the royalty (1%)
-        _setDefaultRoyalty(address(this), 100);
+        initialHi = hiPrice = _initialHi;
+        initialLo = loPrice = _initialLo;
 
         assert(hiPrice > 0);
         assert(loPrice > 0);
+        assert(hiPrice > loPrice);
 
-        // set up the counts for each sale at each level
-        buysPerStep = _buysPerStep;
-        stepCounts[0] = 0; // HI
-        stepCounts[1] = 0; // LO
+        buyRequiredCount = _buyRequiredCount;
+        buyCounts[HI] = 0;
+        buyCounts[LO] = 0;
+        hiLock = loLock = true;
     }
 
     function getPrice(uint tokenId) private view returns (uint) {
@@ -64,7 +77,7 @@ contract HILOToken is ERC1155, ERC2981, Pausable {
         }
     }
 
-    function updatePrices(uint tokenId) private {
+    function updatePrice(uint tokenId) private {
         if (tokenId == HI) {
             decreaseHiPrice();
         } else {
@@ -86,15 +99,11 @@ contract HILOToken is ERC1155, ERC2981, Pausable {
         console.log("LO price increased to:", loPrice);
     }
 
-    function updateStepCount(uint tokenId) private {
-        // Update the count for the given token
-        uint count = (stepCounts[tokenId] + 1) % buysPerStep;
-        stepCounts[tokenId] = count;
-
-        // update the price if we need to
-        if (count == 0) {
-            updatePrices(tokenId);
-        }
+    function updateBuyCount(uint tokenId) private returns (bool) {
+        // Update the count for the given token. return if the count should unlock
+        uint count = buyCounts[tokenId] + 1 % buyRequiredCount;
+        buyCounts[tokenId] = count;
+        return count == 0;
     }
 
     function addAction (address player, uint tokenId) private {
@@ -108,8 +117,6 @@ contract HILOToken is ERC1155, ERC2981, Pausable {
     }
 
     function priceConverged(uint price) private {
-        // prices are converged!
-
         // get the winners
         Action[] memory wins = actions[hiPrice]; // which price doesn't matter; they converged
         for (uint i = 0; i < wins.length; i++) {
@@ -139,12 +146,14 @@ contract HILOToken is ERC1155, ERC2981, Pausable {
         // check the player does not have any tokens already
         require(balanceOf(msg.sender, HI) == 0 && balanceOf(msg.sender, LO) == 0, "HILO: cannot have more than one token");
 
-        // check if the price is valid
+        // get price, if we are starting then update the price immediately
         uint price = getPrice(tokenId);
         assert(price > 0);
 
-        // add royalty
-        // TODO
+        // update the price after the first buy so we can get the ball rolling
+        if ((price == initialLo && tokenId == LO) || (price == initialHi && tokenId == HI)) {
+            updatePrice(tokenId);
+        }
 
         // check if the player has enough to buy
         require(msg.value >= price, "Insufficient funds");
@@ -152,11 +161,32 @@ contract HILOToken is ERC1155, ERC2981, Pausable {
         // mint and transfer the token
         _mint(msg.sender, tokenId, 1, "");
 
-        // update the step count
-        updateStepCount(tokenId);
+        // update the buy count
+        bool shouldUnlock = updateBuyCount(tokenId);
+        if (shouldUnlock) {
+            // unlock the sale
+            if (tokenId == HI) {
+                hiLock = false;
+            } else {
+                loLock = false;
+            }
+
+            // and kick off a sale if any are in the queue
+            if (saleQueue.length > 0) {
+                address nextSeller = saleQueue[saleQueueIndex++];
+                _sell(nextSeller, tokenId);
+            }
+        }
     }
 
     function sell(uint tokenId) public {
+        // this is because we want to sell from the queue sometimes.
+        // TBD if this will actually work, since we aren't signing the transaction
+        address player = msg.sender;
+        _sell(player, tokenId);
+    }
+
+    function _sell(address player, uint tokenId) public {
         // check if paused
         require(!paused(), "Game is paused.");
 
@@ -164,16 +194,18 @@ contract HILOToken is ERC1155, ERC2981, Pausable {
         require(tokenId == HI || tokenId == LO, "Invalid token.");
 
         // check if the player has any tokens
-        require(balanceOf(msg.sender, tokenId) > 0, "HILO: cannot sell when you have no tokens");
+        require(balanceOf(player, HI) == 0 && balanceOf(player, LO) == 0, "HILO: cannot sell when you have no tokens");
+
+        // check the lock is open
+        // if it isn't, add us to the queue
+        // add the action
+        addAction(player, tokenId);
 
         // burn the token
-        _burn(msg.sender, tokenId, 1);
+        _burn(player, tokenId, 1);
 
-        // pay them (minus royalty from "free" LO transfer)
+        // pay them
         // TODO
-
-        // add the action
-        addAction(msg.sender, tokenId);
 
         // end game if the prices converged
         if (hiPrice == loPrice) {
@@ -181,20 +213,15 @@ contract HILOToken is ERC1155, ERC2981, Pausable {
         }
 
         // send them LO if they sold HI
-        if (tokenId == HI && balanceOf(msg.sender, LO) == 0) {
-            _mint(msg.sender, LO, 1, "");
-            updateStepCount(tokenId);
-            console.log("LO transferred from HI sale, recepient:", msg.sender);
+        if (tokenId == HI && balanceOf(player, LO) == 0) {
+            _mint(player, LO, 1, "");
+            updateBuyCount(LO);
+            console.log("LO transferred from HI sale, recepient:", player);
         }
     }
 
     function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data) internal whenNotPaused override {
         require(from == address(this) || to == address(this), "HILOToken: non transferrable");
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
-    }
-
-    // The following functions are overrides required by Solidity.
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, ERC2981) returns (bool) {
-        return super.supportsInterface(interfaceId);
     }
 }
