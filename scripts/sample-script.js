@@ -15,7 +15,7 @@ async function main() {
 
   // We get the contract to deploy
   const HILOToken = await hre.ethers.getContractFactory("HILOToken");
-  const token = await HILOToken.deploy(3, 1);
+  const token = await HILOToken.deploy(5, 1, 2);
 
   await token.deployed();
 

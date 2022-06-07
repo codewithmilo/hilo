@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
@@ -47,6 +48,12 @@ contract HILOToken is ERC1155, Ownable, Pausable {
     // the winners!
     address[] private winners;
 
+    // implement USDC for payments
+    // mumbai: 0xB34F3Ba5Ac6001b5b929323AeCd0eA133a788b76
+    // polygon: 0xe11a86849d99f524cac3e7a0ec1241828e332c62
+    IERC20 public usdc;
+
+
     event hiDecreased(uint previousHiPrice);
     event loIncreased(uint previousLoPrice);
     event pricesConverged(address[] winners, uint price);
@@ -65,6 +72,8 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         buyCounts[HI] = 0;
         buyCounts[LO] = 0;
         hiLock = loLock = true;
+
+        usdc = IERC20(0xB34F3Ba5Ac6001b5b929323AeCd0eA133a788b76);
     }
 
     function getPrice(uint tokenId) private view returns (uint) {
@@ -136,7 +145,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         }
     }
 
-    function buy(uint tokenId) public payable {
+    function buy(uint tokenId, uint amount) public {
         // check if paused
         require(!paused(), "Game is paused.");
 
@@ -156,9 +165,12 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         }
 
         // check if the player has enough to buy
-        require(msg.value >= price, "Insufficient funds");
+        require(amount >= price, "Insufficient funds");
 
-        // mint and transfer the token
+        // get the money
+        usdc.transferFrom(msg.sender, address(this), amount);
+
+        // mint the token for them
         _mint(msg.sender, tokenId, 1, "");
 
         // update the buy count
@@ -201,11 +213,12 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         // add the action
         addAction(player, tokenId);
 
+        // pay them
+        uint price = getPrice(tokenId);
+        usdc.transfer(player, price);
+
         // burn the token
         _burn(player, tokenId, 1);
-
-        // pay them
-        // TODO
 
         // end game if the prices converged
         if (hiPrice == loPrice) {
