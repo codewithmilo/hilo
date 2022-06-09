@@ -198,7 +198,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         _sell(player, tokenId);
     }
 
-    function _sell(address player, uint tokenId) public {
+    function _sell(address player, uint tokenId) private {
         // check if paused
         require(!paused(), "Game is paused.");
 
