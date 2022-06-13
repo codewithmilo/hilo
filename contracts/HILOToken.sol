@@ -76,7 +76,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         usdc = IERC20(0xB34F3Ba5Ac6001b5b929323AeCd0eA133a788b76);
     }
 
-    function getPrice(uint tokenId) private view returns (uint) {
+    function getPrice(uint tokenId) public view returns (uint) {
         if (tokenId == HI) {
             return hiPrice;
         } else if (tokenId == LO) {
