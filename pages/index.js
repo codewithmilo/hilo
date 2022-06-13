@@ -7,6 +7,17 @@ import { providers, Contract } from "ethers";
 
 import abi from "../src/HILOToken.json";
 
+import {
+  Container,
+  Text,
+  Spacer,
+  Grid,
+  Card,
+  Button,
+  Modal,
+  Row,
+} from "@nextui-org/react";
+
 const POLYGON_CHAIN_ID = 137;
 const MUMBAI_CHAIN_ID = 80001;
 const CHAIN_ID = MUMBAI_CHAIN_ID;
@@ -22,31 +33,24 @@ export default function Home() {
   const [hiPrice, setHiPrice] = useState(0);
   const [loPrice, setLoPrice] = useState(0);
 
+  const [hiVisible, setHiVisible] = useState(false);
+  const hiHandler = () => setHiVisible(true);
+  const closeHiHandler = () => {
+    setHiVisible(false);
+    console.log("HI modal closed");
+  };
+
   // Create a reference to the Web3 Modal (used for connecting to Metamask) which persists as long as the page is open
   const web3ModalRef = useRef();
 
   const contractAddress = "0x4A2ad292A7989Cc10b64B8106d51776B5aC3BED0";
   const contractABI = abi.abi;
 
-  /**
-   * Returns a Provider or Signer object representing the Ethereum RPC with or without the
-   * signing capabilities of metamask attached
-   *
-   * A `Provider` is needed to interact with the blockchain - reading transactions, reading balances, reading state, etc.
-   *
-   * A `Signer` is a special type of Provider used in case a `write` transaction needs to be made to the blockchain, which involves the connected account
-   * needing to make a digital signature to authorize the transaction being sent. Metamask exposes a Signer API to allow your website to
-   * request signatures from the user using Signer functions.
-   *
-   * @param {*} needSigner - True if you need the signer, default false otherwise
-   */
   const getProviderOrSigner = async (needSigner = false) => {
-    // Connect to Metamask
-    // Since we store `web3Modal` as a reference, we need to access the `current` value to get access to the underlying object
     const provider = await web3ModalRef.current.connect();
     const web3Provider = new providers.Web3Provider(provider);
 
-    // If user is not connected to the Mumbai network, let them know and throw an error
+    // If user is not connected to the Polygon/Mumbai network, let them know and throw an error
     const { chainId } = await web3Provider.getNetwork();
     if (chainId !== CHAIN_ID) {
       window.alert("Change the network to Polygon");
@@ -115,6 +119,31 @@ export default function Home() {
     }
   };
 
+  const buyHi = async () => {
+    try {
+      if (walletConnected) {
+        const provider = await getProviderOrSigner(true);
+
+        /*
+         * You're using contractABI here
+         */
+        const HILOContract = new Contract(
+          contractAddress,
+          contractABI,
+          provider
+        );
+
+        let buyTxn = await HILOContract.buy(HI_TOKEN_ID, hiPrice);
+        console.log("Bought tokenID %s", tokenId);
+        console.log(buyTxn);
+      } else {
+        console.log("Wallet not connected!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   useEffect(() => {
     // if wallet is not connected, create a new instance of Web3Modal
     if (!walletConnected) {
@@ -133,52 +162,97 @@ export default function Home() {
   }, [walletConnected]);
 
   return (
-    <div className={styles.container}>
-      <Head>
-        <title>HILO</title>
-        <meta name="description" content="HILO: A token game" />
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
+    <Container fluid css={{ minHeight: "100vh", position: "relative" }}>
+      <Text h1 className={styles.title}>
+        HILO
+      </Text>
 
-      <main className={styles.main}>
-        <h1 className={styles.title}>HILO</h1>
+      <Spacer y={2} />
 
-        <p className={styles.description}>A game of tokens</p>
+      <Text h4 className={styles.description}>
+        A game of tokens
+      </Text>
 
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>How to play</h2>
-          </a>
+      <Spacer y={1} />
 
-          <div className={styles.card}>{renderConnectButton()}</div>
+      <Text h5 className={styles.description}>
+        How to play
+      </Text>
 
-          <a
-            href="https://github.com/vercel/next.js/tree/canary/examples"
-            className={styles.card}
-          >
-            <h2>HI price:</h2>
-            <p>{hiPrice}</p>
-          </a>
+      {walletConnected ? null : (
+        <>
+          <Spacer y={1} />
+          {
+            <Card variant="flat">
+              <Card.Body>{renderConnectButton()}</Card.Body>
+            </Card>
+          }
+        </>
+      )}
 
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>LO price:</h2>
-            <p>{loPrice}</p>
-          </a>
-        </div>
-      </main>
+      <Spacer y={6} />
+
+      <Grid.Container gap={3} justify="center">
+        <Grid xs={4}>
+          <Card variant="bordered">
+            <Card.Header>
+              <Text className={styles.hiTitle}>HI</Text>
+            </Card.Header>
+            <Card.Body>${hiPrice}</Card.Body>
+            <Card.Divider />
+            <Card.Footer>
+              <Button size="sm" onClick={hiHandler}>
+                Trade
+              </Button>
+              <Modal
+                closeButton
+                blur
+                aria-labelledby="modal-title"
+                open={hiVisible}
+                onClose={closeHiHandler}
+              >
+                <Modal.Header>
+                  <Text h3 id="modal-title" size={18}>
+                    Trade HI
+                  </Text>
+                </Modal.Header>
+                <Modal.Body>
+                  <Row justify="space-around">
+                    <Button auto flat color="secondary" onPress={buyHi}>
+                      Buy
+                    </Button>
+                    <Button auto flat color="success">
+                      Sell
+                    </Button>
+                  </Row>
+                </Modal.Body>
+              </Modal>
+            </Card.Footer>
+          </Card>
+        </Grid>
+        <Grid xs={4}>
+          <Card variant="bordered">
+            <Card.Header>
+              <Text className={styles.loTitle}>LO</Text>
+            </Card.Header>
+            <Card.Body>${loPrice}</Card.Body>
+            <Card.Divider />
+            <Card.Footer>
+              <Button size="sm">Trade</Button>
+            </Card.Footer>
+          </Card>
+        </Grid>
+      </Grid.Container>
 
       <footer className={styles.footer}>
         <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
+          href="https://twitter.com/molocw"
           target="_blank"
           rel="noopener noreferrer"
         >
           A MOLO production
         </a>
       </footer>
-    </div>
+    </Container>
   );
 }
