@@ -1,25 +1,19 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// When running the script with `npx hardhat run <script>` you'll find the Hardhat
-// Runtime Environment's members available in the global scope.
 const hre = require("hardhat");
 
 async function main() {
-  // Hardhat always runs the compile task when running scripts with its command
-  // line interface.
-  //
-  // If this script is run directly using `node` you may want to call compile
-  // manually to make sure everything is compiled
-  // await hre.run('compile');
+  const hiPrice = 5;
+  const loPrice = 1;
+  const buyCount = 2;
 
   // We get the contract to deploy
   const HILOToken = await hre.ethers.getContractFactory("HILOToken");
-  const token = await HILOToken.deploy(5, 1, 2);
+  const token = await HILOToken.deploy(hiPrice, loPrice, buyCount);
 
   await token.deployed();
 
   console.log("Token deployed to:", token.address);
+
+  // After this finishes, run `npx hardhat verify ~token.address~ ~hiPrice~ ~loPrice~ ~buyCount~` to verify
 }
 
 // We recommend this pattern to be able to use async/await everywhere

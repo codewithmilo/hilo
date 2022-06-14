@@ -49,13 +49,13 @@ contract HILOToken is ERC1155, Ownable, Pausable {
     address[] private winners;
 
     // implement USDC for payments
-    // mumbai: 0xB34F3Ba5Ac6001b5b929323AeCd0eA133a788b76
-    // polygon: 0xe11a86849d99f524cac3e7a0ec1241828e332c62
+    // mumbai: 0xe11A86849d99F524cAC3E7A0Ec1241828e332C62
     IERC20 public usdc;
 
 
-    event hiDecreased(uint previousHiPrice);
-    event loIncreased(uint previousLoPrice);
+    event hiDecreased(uint newHiPrice);
+    event loIncreased(uint newLoPrice);
+    event actionAdded(address player, uint tokenId, uint price);
     event pricesConverged(address[] winners, uint price);
 
     constructor(uint _initialHi, uint _initialLo, uint _buyRequiredCount) ERC1155("") {
@@ -73,7 +73,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         buyCounts[LO] = 0;
         hiLock = loLock = true;
 
-        usdc = IERC20(0xB34F3Ba5Ac6001b5b929323AeCd0eA133a788b76);
+        usdc = IERC20(0xe11A86849d99F524cAC3E7A0Ec1241828e332C62);
     }
 
     function getPrice(uint tokenId) public view returns (uint) {
@@ -98,14 +98,12 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         hiPrice = hiPrice - 1;
         assert(hiPrice > 0);
         emit hiDecreased(hiPrice);
-        console.log("HI price decreased to:", hiPrice);
     }
 
     function increaseLoPrice() private {
         loPrice = loPrice + 1;
         assert(loPrice < hiPrice);
         emit loIncreased(loPrice);
-        console.log("LO price increased to:", loPrice);
     }
 
     function updateBuyCount(uint tokenId) private returns (bool) {
@@ -119,10 +117,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         uint price = getPrice(tokenId);
         Action memory action = Action(player, tokenId, price);
         actions[price].push(action);
-        console.log("New action!");
-        console.log("\tplayer:", action.player);
-        console.log("\ttokenId:", action.tokenId);
-        console.log("\tprice:", action.price);
+        emit actionAdded(player, tokenId, price);
     }
 
     function priceConverged(uint price) private {
@@ -145,47 +140,54 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         }
     }
 
-    function buy(uint tokenId, uint amount) public {
-        console.log("Buying token: ", tokenId);
-        console.log("Amount: ", amount);
+    event buyPriceCheck(address player, uint tokenId, uint price);
+    event buyPriceUpdate(address player, uint tokenId);
+    
+    // debugging
+    event playerBalanceCheck(address player, uint balance);
+    event playerPayment(address player, uint amount);
+    event tokenMinted(address player, uint tokenId);
+    event shouldUnlockCheck(uint tokenId, bool shouldUnlock);
+    event saleUnlocked(uint tokenId);
 
+    function buy(uint tokenId) public {
         // check if paused
         require(!paused(), "Game is paused.");
 
         // check if the token is valid
         require(tokenId == HI || tokenId == LO, "Invalid token.");
-        console.log("Token is valid.");
 
         // check the player does not have any tokens already
         require(balanceOf(msg.sender, HI) == 0 && balanceOf(msg.sender, LO) == 0, "HILO: cannot have more than one token");
-        console.log("Player has no tokens.");
 
         // get price, if we are starting then update the price immediately
         uint price = getPrice(tokenId);
         assert(price > 0);
-        console.log("Price: ", price);
+        emit buyPriceCheck(msg.sender, tokenId, price);
 
         // update the price after the first buy so we can get the ball rolling
         if ((price == initialLo && tokenId == LO) || (price == initialHi && tokenId == HI)) {
             updatePrice(tokenId);
-            console.log("Price updated.");
+            emit buyPriceUpdate(msg.sender, tokenId);
         }
 
         // check if the player has enough to buy
-        require(amount >= price, "Insufficient funds");
-        console.log("Player has enough to buy.");
+        uint playerBalance = usdc.balanceOf(msg.sender);
+        emit playerBalanceCheck(msg.sender, playerBalance);
+        require(playerBalance >= price, "Insufficient USDC balance.");
+        
 
         // get the money
-        usdc.transferFrom(msg.sender, address(this), amount);
-        console.log("USDC transferred.");
+        // usdc.transferFrom(msg.sender, address(this), price);
+        // emit playerPayment(msg.sender, price);
 
         // mint the token for them
         _mint(msg.sender, tokenId, 1, "");
-        console.log("Token minted.");
+        emit tokenMinted(msg.sender, tokenId);
 
         // update the buy count
         bool shouldUnlock = updateBuyCount(tokenId);
-        console.log("Should unlock?", shouldUnlock);
+        emit shouldUnlockCheck(tokenId, shouldUnlock);
 
         if (shouldUnlock) {
             // unlock the sale
@@ -194,14 +196,12 @@ contract HILOToken is ERC1155, Ownable, Pausable {
             } else {
                 loLock = false;
             }
-            console.log("Sale unlocked for token:", tokenId);
+            emit saleUnlocked(tokenId);
 
             // and kick off a sale if any are in the queue
             if (saleQueue.length > 0) {
-                console.log("Sale queue has items, starting sale.");
                 address nextSeller = saleQueue[saleQueueIndex++];
                 _sell(nextSeller, tokenId);
-                console.log("Sold to ", nextSeller);   
             }
         }
     }
@@ -249,7 +249,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
     }
 
     function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data) internal whenNotPaused override {
-        require(from == address(this) || to == address(this), "HILOToken: non transferrable");
+        require(from == address(0) || from == address(this) || to == address(this), "HILOToken: non transferrable");
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
 }
