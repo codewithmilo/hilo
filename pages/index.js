@@ -33,6 +33,9 @@ export default function Home() {
   const [hiPrice, setHiPrice] = useState(0);
   const [loPrice, setLoPrice] = useState(0);
 
+  const [hasHi, setHasHi] = useState(false);
+  const [hasLo, setHasLo] = useState(false);
+
   const [howToVisible, setHowToVisible] = useState(false);
 
   const [hiVisible, setHiVisible] = useState(false);
@@ -102,16 +105,13 @@ export default function Home() {
       if (walletConnected) {
         const provider = await getProviderOrSigner();
 
-        /*
-         * You're using contractABI here
-         */
         const HILOContract = new Contract(
           contractAddress,
           contractABI,
           provider
         );
 
-        let price = await HILOContract.getPrice(tokenId);
+        const price = await HILOContract.getPrice(tokenId);
         console.log("Got price for tokenID %s: %s", tokenId, price.toNumber());
         if (tokenId === HI_TOKEN_ID) {
           setHiPrice(price.toNumber());
@@ -126,11 +126,42 @@ export default function Home() {
     }
   };
 
+  const getBalance = async (tokenId) => {
+    try {
+      if (walletConnected) {
+        const signer = await getProviderOrSigner(true);
+        const address = await signer.getAddress();
+
+        const HILOContract = new Contract(
+          contractAddress,
+          contractABI,
+          provider
+        );
+
+        const balance = await HILOContract.balanceOf(address, tokenId);
+        console.log(
+          "Got balance for tokenID %s: %s",
+          tokenId,
+          balance.toNumber()
+        );
+        if (tokenId === HI_TOKEN_ID) {
+          setHasHi(balance.toNumber() > 0);
+        } else {
+          setHasLo(balance.toNumber() > 0);
+        }
+      } else {
+        console.log("Wallet not connected!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   const toggleHowTo = () => {
     setHowToVisible(!howToVisible);
   };
 
-  const buyHi = async () => {
+  const buyHiHandler = async () => {
     try {
       if (walletConnected) {
         const provider = await getProviderOrSigner(true);
@@ -155,6 +186,10 @@ export default function Home() {
     }
   };
 
+  const sellHiHandler = async () => {};
+  const buyLoHandler = async () => {};
+  const sellLoHandler = async () => {};
+
   useEffect(() => {
     // if wallet is not connected, create a new instance of Web3Modal
     if (!walletConnected) {
@@ -169,6 +204,10 @@ export default function Home() {
       // if wallet is connected, get the price of the tokens
       getPrice(HI_TOKEN_ID);
       getPrice(LO_TOKEN_ID);
+
+      // then check if the user has any tokens
+      getBalance(HI_TOKEN_ID);
+      getBalance(LO_TOKEN_ID);
     }
   }, [walletConnected]);
 
@@ -184,7 +223,32 @@ export default function Home() {
 
       <Spacer y={2} />
 
-      {walletConnected || renderConnectButton()}
+      {walletConnected ? (
+        <Grid.Container gap={3} justify="center">
+          <Grid xs={4}>
+            {tokenCard(
+              "Hi",
+              hiPrice,
+              buyHiHandler,
+              sellHiHandler,
+              hasHi,
+              !hasHi
+            )}
+          </Grid>
+          <Grid xs={4}>
+            {tokenCard(
+              "Lo",
+              loPrice,
+              buyLoHandler,
+              sellLoHandler,
+              hasLo,
+              !hasLo
+            )}
+          </Grid>
+        </Grid.Container>
+      ) : (
+        renderConnectButton()
+      )}
 
       <Spacer y={4} />
 
@@ -198,66 +262,6 @@ export default function Home() {
 
       <Spacer y={6} />
 
-      {walletConnected && (
-        <Grid.Container gap={3} justify="center">
-          <Grid xs={4}>
-            <Card variant="bordered">
-              <Card.Header>
-                <Text h4 className={styles.hiTitle}>
-                  Hi
-                </Text>
-              </Card.Header>
-              <Card.Body>${hiPrice}</Card.Body>
-              <Card.Divider />
-              <Card.Footer>
-                <Button size="sm" color="gradient" onClick={hiHandler}>
-                  Trade
-                </Button>
-                <Modal
-                  closeButton
-                  blur
-                  aria-labelledby="modal-title"
-                  open={hiVisible}
-                  onClose={closeHiHandler}
-                >
-                  <Modal.Header>
-                    <Text h3 id="modal-title" size={18}>
-                      Trade HI
-                    </Text>
-                  </Modal.Header>
-                  <Modal.Body>
-                    <Row justify="space-around">
-                      <Button auto flat color="secondary" onPress={buyHi}>
-                        Buy
-                      </Button>
-                      <Button auto flat color="success">
-                        Sell
-                      </Button>
-                    </Row>
-                  </Modal.Body>
-                </Modal>
-              </Card.Footer>
-            </Card>
-          </Grid>
-          <Grid xs={4}>
-            <Card variant="bordered">
-              <Card.Header>
-                <Text h4 className={styles.loTitle}>
-                  Lo
-                </Text>
-              </Card.Header>
-              <Card.Body>${loPrice}</Card.Body>
-              <Card.Divider />
-              <Card.Footer>
-                <Button size="sm" color="gradient">
-                  Trade
-                </Button>
-              </Card.Footer>
-            </Card>
-          </Grid>
-        </Grid.Container>
-      )}
-
       <footer className={styles.footer}>
         <a
           href="https://twitter.com/molocw"
@@ -270,6 +274,33 @@ export default function Home() {
     </Container>
   );
 }
+
+const tokenCard = (
+  tokenType,
+  price,
+  buy,
+  sell,
+  shouldDisableBuy,
+  shouldDisableSell
+) => (
+  <Card variant="bordered">
+    <Card.Body className={styles.tokenCard}>
+      <Text h1>{tokenType}</Text>
+      <Text h2>${price}</Text>
+    </Card.Body>
+    <Card.Divider />
+    <Card.Footer css={{ justifyContent: "center" }}>
+      <Button.Group color="gradient" size="md" ghost>
+        <Button onPress={buy} disabled={shouldDisableBuy}>
+          <Text h3>Buy</Text>
+        </Button>
+        <Button onPress={sell} disabled={shouldDisableSell}>
+          <Text h3>Sell</Text>
+        </Button>
+      </Button.Group>
+    </Card.Footer>
+  </Card>
+);
 
 const howToDescription = (
   <Card variant="flat" className={styles.description}>

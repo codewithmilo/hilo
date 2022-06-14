@@ -23,9 +23,8 @@
   }
 }
 
-.hiTitle,
-.loTitle {
-  text-align: center;
+.tokenCard {
+  text-align: center !important;
 }
 
 .footer {
