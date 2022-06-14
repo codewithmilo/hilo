@@ -147,48 +147,62 @@ contract HILOToken is ERC1155, Ownable, Pausable {
 
     function buy(uint tokenId, uint amount) public {
         // check if paused
-        require(!paused(), "Game is paused.");
+        // require(!paused(), "Game is paused.");
+        console.log("Buying token: ", tokenId);
+        console.log("Amount: ", amount);
 
-        // check if the token is valid
-        require(tokenId == HI || tokenId == LO, "Invalid token.");
+        // // check if the token is valid
+        // require(tokenId == HI || tokenId == LO, "Invalid token.");
+        // console.log("Token is valid.");
 
-        // check the player does not have any tokens already
-        require(balanceOf(msg.sender, HI) == 0 && balanceOf(msg.sender, LO) == 0, "HILO: cannot have more than one token");
+        // // check the player does not have any tokens already
+        // require(balanceOf(msg.sender, HI) == 0 && balanceOf(msg.sender, LO) == 0, "HILO: cannot have more than one token");
+        // console.log("Player has no tokens.");
 
-        // get price, if we are starting then update the price immediately
-        uint price = getPrice(tokenId);
-        assert(price > 0);
+        // // get price, if we are starting then update the price immediately
+        // uint price = getPrice(tokenId);
+        // assert(price > 0);
+        // console.log("Price: ", price);
 
-        // update the price after the first buy so we can get the ball rolling
-        if ((price == initialLo && tokenId == LO) || (price == initialHi && tokenId == HI)) {
-            updatePrice(tokenId);
-        }
+        // // update the price after the first buy so we can get the ball rolling
+        // if ((price == initialLo && tokenId == LO) || (price == initialHi && tokenId == HI)) {
+        //     updatePrice(tokenId);
+        //     console.log("Price updated.");
+        // }
 
-        // check if the player has enough to buy
-        require(amount >= price, "Insufficient funds");
+        // // check if the player has enough to buy
+        // require(amount >= price, "Insufficient funds");
+        // console.log("Player has enough to buy.");
 
-        // get the money
-        usdc.transferFrom(msg.sender, address(this), amount);
+        // // get the money
+        // usdc.transferFrom(msg.sender, address(this), amount);
+        // console.log("USDC transferred.");
 
-        // mint the token for them
-        _mint(msg.sender, tokenId, 1, "");
+        // // mint the token for them
+        // _mint(msg.sender, tokenId, 1, "");
+        // console.log("Token minted.");
 
-        // update the buy count
-        bool shouldUnlock = updateBuyCount(tokenId);
-        if (shouldUnlock) {
-            // unlock the sale
-            if (tokenId == HI) {
-                hiLock = false;
-            } else {
-                loLock = false;
-            }
+        // // update the buy count
+        // bool shouldUnlock = updateBuyCount(tokenId);
+        // console.log("Should unlock?", shouldUnlock);
 
-            // and kick off a sale if any are in the queue
-            if (saleQueue.length > 0) {
-                address nextSeller = saleQueue[saleQueueIndex++];
-                _sell(nextSeller, tokenId);
-            }
-        }
+        // if (shouldUnlock) {
+        //     // unlock the sale
+        //     if (tokenId == HI) {
+        //         hiLock = false;
+        //     } else {
+        //         loLock = false;
+        //     }
+        //     console.log("Sale unlocked for token:", tokenId);
+
+        //     // and kick off a sale if any are in the queue
+        //     if (saleQueue.length > 0) {
+        //         console.log("Sale queue has items, starting sale.");
+        //         address nextSeller = saleQueue[saleQueueIndex++];
+        //         _sell(nextSeller, tokenId);
+        //         console.log("Sold to ", nextSeller);
+        //     }
+        // }
     }
 
     function sell(uint tokenId) public {
