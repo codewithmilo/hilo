@@ -182,7 +182,11 @@ export default function Home() {
         A Game of Tokens
       </Text>
 
-      <Spacer y={1} />
+      <Spacer y={2} />
+
+      {walletConnected || renderConnectButton()}
+
+      <Spacer y={4} />
 
       <Text size="1.8rem" className={styles.howTo} onClick={toggleHowTo}>
         How to play
@@ -190,102 +194,69 @@ export default function Home() {
 
       <Spacer y={1} />
 
-      {walletConnected || renderConnectButton()}
-
-      <Spacer y={1} />
-
-      {howToVisible && (
-        <Card variant="flat" className={styles.description}>
-          <Card.Body>
-            <Text size="1.5rem">
-              Buy a <b>Hi</b> or <b>Lo</b> token. <br />
-              <b>Lo</b> starts at <b>$1</b>
-              <br />
-              <b>Hi</b> starts at <b>$1,000</b>
-            </Text>
-            <Text size="1.5rem">
-              If there are two buys of a single token
-              <br />
-              <b>Lo</b> increases by <b>$1 // Hi</b> decreases by <b>$1</b>
-            </Text>
-            <br />
-            <Text>
-              Sell back a <b>Lo</b> to get a profit after the price has
-              increased
-              <br />
-              Sell back a <b>Hi</b> to get a free <b>Lo</b> token
-            </Text>
-            <br />
-            <Text>
-              When the prices converge—a <b>Hi</b> and <b>Lo</b> are both sold
-              for the same price—<b>the game is over</b>
-              <br />
-              The two winners who sold split the jackpot of <b>$100,000</b>
-              <br />
-            </Text>
-            <br />
-            <Text size="1.5rem" css={{ textAlign: "center" }}>
-              Good luck!
-            </Text>
-          </Card.Body>
-        </Card>
-      )}
+      {howToVisible && howToDescription}
 
       <Spacer y={6} />
 
-      <Grid.Container gap={3} justify="center">
-        <Grid xs={4}>
-          <Card variant="bordered">
-            <Card.Header>
-              <Text className={styles.hiTitle}>HI</Text>
-            </Card.Header>
-            <Card.Body>${hiPrice}</Card.Body>
-            <Card.Divider />
-            <Card.Footer>
-              <Button size="sm" color="gradient" onClick={hiHandler}>
-                Trade
-              </Button>
-              <Modal
-                closeButton
-                blur
-                aria-labelledby="modal-title"
-                open={hiVisible}
-                onClose={closeHiHandler}
-              >
-                <Modal.Header>
-                  <Text h3 id="modal-title" size={18}>
-                    Trade HI
-                  </Text>
-                </Modal.Header>
-                <Modal.Body>
-                  <Row justify="space-around">
-                    <Button auto flat color="secondary" onPress={buyHi}>
-                      Buy
-                    </Button>
-                    <Button auto flat color="success">
-                      Sell
-                    </Button>
-                  </Row>
-                </Modal.Body>
-              </Modal>
-            </Card.Footer>
-          </Card>
-        </Grid>
-        <Grid xs={4}>
-          <Card variant="bordered">
-            <Card.Header>
-              <Text className={styles.loTitle}>LO</Text>
-            </Card.Header>
-            <Card.Body>${loPrice}</Card.Body>
-            <Card.Divider />
-            <Card.Footer>
-              <Button size="sm" color="gradient">
-                Trade
-              </Button>
-            </Card.Footer>
-          </Card>
-        </Grid>
-      </Grid.Container>
+      {walletConnected && (
+        <Grid.Container gap={3} justify="center">
+          <Grid xs={4}>
+            <Card variant="bordered">
+              <Card.Header>
+                <Text h4 className={styles.hiTitle}>
+                  Hi
+                </Text>
+              </Card.Header>
+              <Card.Body>${hiPrice}</Card.Body>
+              <Card.Divider />
+              <Card.Footer>
+                <Button size="sm" color="gradient" onClick={hiHandler}>
+                  Trade
+                </Button>
+                <Modal
+                  closeButton
+                  blur
+                  aria-labelledby="modal-title"
+                  open={hiVisible}
+                  onClose={closeHiHandler}
+                >
+                  <Modal.Header>
+                    <Text h3 id="modal-title" size={18}>
+                      Trade HI
+                    </Text>
+                  </Modal.Header>
+                  <Modal.Body>
+                    <Row justify="space-around">
+                      <Button auto flat color="secondary" onPress={buyHi}>
+                        Buy
+                      </Button>
+                      <Button auto flat color="success">
+                        Sell
+                      </Button>
+                    </Row>
+                  </Modal.Body>
+                </Modal>
+              </Card.Footer>
+            </Card>
+          </Grid>
+          <Grid xs={4}>
+            <Card variant="bordered">
+              <Card.Header>
+                <Text h4 className={styles.loTitle}>
+                  Lo
+                </Text>
+              </Card.Header>
+              <Card.Body>${loPrice}</Card.Body>
+              <Card.Divider />
+              <Card.Footer>
+                <Button size="sm" color="gradient">
+                  Trade
+                </Button>
+              </Card.Footer>
+            </Card>
+          </Grid>
+        </Grid.Container>
+      )}
 
       <footer className={styles.footer}>
         <a
@@ -299,3 +270,40 @@ export default function Home() {
     </Container>
   );
 }
+
+const howToDescription = (
+  <Card variant="flat" className={styles.description}>
+    <Card.Body>
+      <Text size="1.5rem">
+        Buy a <b>Hi</b> or <b>Lo</b> token (with USDC)
+        <br />
+        <b>Lo</b> starts at <b>$1</b>
+        <br />
+        <b>Hi</b> starts at <b>$1,000</b>
+      </Text>
+      <Text size="1.5rem">
+        If there are two buys of a single token
+        <br />
+        <b>Lo</b> increases by <b>$1 // Hi</b> decreases by <b>$1</b>
+      </Text>
+      <br />
+      <Text>
+        Sell back a <b>Lo</b> to get a profit after the price has increased
+        <br />
+        Sell back a <b>Hi</b> to get a free <b>Lo</b> token
+      </Text>
+      <br />
+      <Text>
+        When the prices converge—a <b>Hi</b> and <b>Lo</b> are both sold for the
+        same price—<b>the game is over</b>
+        <br />
+        The two winners who sold split the jackpot of <b>$100,000</b>
+        <br />
+      </Text>
+      <br />
+      <Text size="1.5rem" css={{ textAlign: "center" }}>
+        Good luck!
+      </Text>
+    </Card.Body>
+  </Card>
+);
