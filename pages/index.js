@@ -33,6 +33,8 @@ export default function Home() {
   const [hiPrice, setHiPrice] = useState(0);
   const [loPrice, setLoPrice] = useState(0);
 
+  const [howToVisible, setHowToVisible] = useState(false);
+
   const [hiVisible, setHiVisible] = useState(false);
   const hiHandler = () => setHiVisible(true);
   const closeHiHandler = () => {
@@ -83,9 +85,14 @@ export default function Home() {
       return <p>Wallet connected</p>;
     } else {
       return (
-        <button onClick={connectWallet} className={styles.button}>
-          Connect your wallet
-        </button>
+        <Button
+          color="gradient"
+          size="lg"
+          css={{ maxWidth: "200px", margin: "0 auto" }}
+          onPress={connectWallet}
+        >
+          Connect wallet to play
+        </Button>
       );
     }
   };
@@ -117,6 +124,10 @@ export default function Home() {
     } catch (error) {
       console.log(error);
     }
+  };
+
+  const toggleHowTo = () => {
+    setHowToVisible(!howToVisible);
   };
 
   const buyHi = async () => {
@@ -163,31 +174,61 @@ export default function Home() {
 
   return (
     <Container fluid css={{ minHeight: "100vh", position: "relative" }}>
-      <Text h1 className={styles.title}>
-        HILO
+      <Text h1 size="8rem" className={styles.title}>
+        HiLo
       </Text>
 
-      <Spacer y={2} />
-
-      <Text h4 className={styles.description}>
-        A game of tokens
+      <Text size="3rem" className={styles.subtitle}>
+        A Game of Tokens
       </Text>
 
       <Spacer y={1} />
 
-      <Text h5 className={styles.description}>
+      <Text size="1.8rem" className={styles.howTo} onClick={toggleHowTo}>
         How to play
       </Text>
 
-      {walletConnected ? null : (
-        <>
-          <Spacer y={1} />
-          {
-            <Card variant="flat">
-              <Card.Body>{renderConnectButton()}</Card.Body>
-            </Card>
-          }
-        </>
+      <Spacer y={1} />
+
+      {walletConnected || renderConnectButton()}
+
+      <Spacer y={1} />
+
+      {howToVisible && (
+        <Card variant="flat" className={styles.description}>
+          <Card.Body>
+            <Text size="1.5rem">
+              Buy a <b>Hi</b> or <b>Lo</b> token. <br />
+              <b>Lo</b> starts at <b>$1</b>
+              <br />
+              <b>Hi</b> starts at <b>$1,000</b>
+            </Text>
+            <Text size="1.5rem">
+              If there are two buys of a single token
+              <br />
+              <b>Lo</b> increases by <b>$1 // Hi</b> decreases by <b>$1</b>
+            </Text>
+            <br />
+            <Text>
+              Sell back a <b>Lo</b> to get a profit after the price has
+              increased
+              <br />
+              Sell back a <b>Hi</b> to get a free <b>Lo</b> token
+            </Text>
+            <br />
+            <Text>
+              When the prices converge—a <b>Hi</b> and <b>Lo</b> are both sold
+              for the same price—<b>the game is over</b>
+              <br />
+              The two winners who sold split the jackpot of <b>$100,000</b>
+              <br />
+            </Text>
+            <br />
+            <Text size="1.5rem" css={{ textAlign: "center" }}>
+              Good luck!
+            </Text>
+          </Card.Body>
+        </Card>
       )}
 
       <Spacer y={6} />
@@ -201,7 +242,7 @@ export default function Home() {
             <Card.Body>${hiPrice}</Card.Body>
             <Card.Divider />
             <Card.Footer>
-              <Button size="sm" onClick={hiHandler}>
+              <Button size="sm" color="gradient" onClick={hiHandler}>
                 Trade
               </Button>
               <Modal
@@ -238,7 +279,9 @@ export default function Home() {
             <Card.Body>${loPrice}</Card.Body>
             <Card.Divider />
             <Card.Footer>
-              <Button size="sm">Trade</Button>
+              <Button size="sm" color="gradient">
+                Trade
+              </Button>
             </Card.Footer>
           </Card>
         </Grid>

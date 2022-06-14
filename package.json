@@ -22,6 +22,7 @@
     "create-react-app": "^5.0.1",
     "dotenv": "^16.0.1",
     "next": "12.1.6",
+    "next-themes": "^0.2.0",
     "react": "^18.1.0",
     "react-dom": "^18.1.0",
     "react-scripts": "5.0.1",
