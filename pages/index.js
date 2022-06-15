@@ -3,7 +3,7 @@ import Head from "next/head";
 import styles from "../styles/Home.module.css";
 
 import Web3Modal from "web3modal";
-import { providers, Contract } from "ethers";
+import { providers, Contract, utils } from "ethers";
 
 import abi from "../src/HILOToken.json";
 
@@ -15,7 +15,6 @@ import {
   Card,
   Button,
   Modal,
-  Row,
 } from "@nextui-org/react";
 
 const POLYGON_CHAIN_ID = 137;
@@ -25,9 +24,14 @@ const CHAIN_ID = MUMBAI_CHAIN_ID;
 const HI_TOKEN_ID = 0;
 const LO_TOKEN_ID = 1;
 
+const USDC_ADDRESS = "0xe11A86849d99F524cAC3E7A0Ec1241828e332C62";
+
 export default function Home() {
-  // walletConnected keep track of whether the user's wallet is connected or not
+  // keep track of whether the user's wallet is connected or not
   const [walletConnected, setWalletConnected] = useState(false);
+
+  // keep track of whether the user has given payment approval or not
+  const [paymentApproved, setPaymentApproved] = useState(false);
 
   // updated prices of the tokens
   const [hiPrice, setHiPrice] = useState(0);
@@ -38,12 +42,7 @@ export default function Home() {
 
   const [howToVisible, setHowToVisible] = useState(false);
 
-  const [hiVisible, setHiVisible] = useState(false);
-  const hiHandler = () => setHiVisible(true);
-  const closeHiHandler = () => {
-    setHiVisible(false);
-    console.log("HI modal closed");
-  };
+  const [approveModalVisible, setApproveModalVisible] = useState(false);
 
   // Create a reference to the Web3 Modal (used for connecting to Metamask) which persists as long as the page is open
   const web3ModalRef = useRef();
@@ -69,9 +68,6 @@ export default function Home() {
     return web3Provider;
   };
 
-  /*
-      connectWallet: Connects the wallet
-    */
   const connectWallet = async () => {
     try {
       // Get the provider from web3Modal
@@ -83,9 +79,33 @@ export default function Home() {
     }
   };
 
+  const approvePayments = async () => {
+    try {
+      if (walletConnected && !paymentApproved) {
+        const signer = await getProviderOrSigner(true);
+        const address = await signer.getAddress();
+        const usdcABI = [
+          "function approve(address _spender, uint256 _value) public returns (bool success)",
+        ];
+        // pre-approval for the max Hi
+        const amount = utils.parseUnits("1000", 18);
+
+        const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
+
+        const approved = await USDCContract.approve(address, amount);
+        console.log("Got approval?", approved);
+        if (approved) setPaymentApproved(true);
+      } else {
+        console.log("Didn't approve!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   const renderConnectButton = () => {
     if (walletConnected) {
-      return <p>Wallet connected</p>;
+      return null;
     } else {
       return (
         <Button
@@ -98,6 +118,65 @@ export default function Home() {
         </Button>
       );
     }
+  };
+
+  const renderApproveButton = () => {
+    if (walletConnected) {
+      if (!paymentApproved) {
+        return (
+          <>
+            <Button
+              color="gradient"
+              size="lg"
+              css={{ maxWidth: "200px", margin: "0 auto" }}
+              onPress={() => setApproveModalVisible(true)}
+            >
+              Pre-approve payments
+            </Button>
+            <Modal
+              blur
+              aria-labelledby="modal-title"
+              aria-describedby="modal-description"
+              onClose={() => setApproveModalVisible(false)}
+              open={approveModalVisible}
+            >
+              <Modal.Header>
+                <Text id="modal-title" h2>
+                  Pre-approve payments
+                </Text>
+              </Modal.Header>
+              <Modal.Body>
+                <Text id="modal-description" size="1.3rem">
+                  This will ask you to approve payments up to $1,000 but you
+                  will only ever be charged at the shown price at the time of
+                  purchase. You will not need to approve payments again.
+                </Text>
+                <br />
+                <Text size="1.3rem">
+                  If you would like to wait to approve the exact amount at
+                  purchase, you can simply do so when you get to it.
+                </Text>
+              </Modal.Body>
+              <Modal.Footer>
+                <Button
+                  auto
+                  flat
+                  color="error"
+                  onClick={() => setApproveModalVisible(false)}
+                >
+                  <Text h4>Cancel</Text>
+                </Button>
+                <Button auto onClick={approvePayments}>
+                  <Text h4>Approve</Text>
+                </Button>
+              </Modal.Footer>
+            </Modal>
+          </>
+        );
+      }
+    }
+
+    return null;
   };
 
   const getPrice = async (tokenId) => {
@@ -132,11 +211,7 @@ export default function Home() {
         const signer = await getProviderOrSigner(true);
         const address = await signer.getAddress();
 
-        const HILOContract = new Contract(
-          contractAddress,
-          contractABI,
-          provider
-        );
+        const HILOContract = new Contract(contractAddress, contractABI, signer);
 
         const balance = await HILOContract.balanceOf(address, tokenId);
         console.log(
@@ -209,6 +284,7 @@ export default function Home() {
       getBalance(HI_TOKEN_ID);
       getBalance(LO_TOKEN_ID);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletConnected]);
 
   return (
@@ -224,28 +300,31 @@ export default function Home() {
       <Spacer y={2} />
 
       {walletConnected ? (
-        <Grid.Container gap={3} justify="center">
-          <Grid xs={4}>
-            {tokenCard(
-              "Hi",
-              hiPrice,
-              buyHiHandler,
-              sellHiHandler,
-              hasHi,
-              !hasHi
-            )}
-          </Grid>
-          <Grid xs={4}>
-            {tokenCard(
-              "Lo",
-              loPrice,
-              buyLoHandler,
-              sellLoHandler,
-              hasLo,
-              !hasLo
-            )}
-          </Grid>
-        </Grid.Container>
+        <>
+          {!paymentApproved && renderApproveButton()}
+          <Grid.Container gap={3} justify="center">
+            <Grid xs={4}>
+              {tokenCard(
+                "Hi",
+                hiPrice,
+                buyHiHandler,
+                sellHiHandler,
+                hasHi,
+                !hasHi
+              )}
+            </Grid>
+            <Grid xs={4}>
+              {tokenCard(
+                "Lo",
+                loPrice,
+                buyLoHandler,
+                sellLoHandler,
+                hasLo,
+                !hasLo
+              )}
+            </Grid>
+          </Grid.Container>
+        </>
       ) : (
         renderConnectButton()
       )}
