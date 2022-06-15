@@ -3,7 +3,7 @@ import Head from "next/head";
 import styles from "../styles/Home.module.css";
 
 import Web3Modal from "web3modal";
-import { providers, Contract, utils } from "ethers";
+import { providers, Contract, utils, getDefaultProvider } from "ethers";
 
 import abi from "../src/HILOToken.json";
 
@@ -18,11 +18,14 @@ const CHAIN_ID = MUMBAI_CHAIN_ID;
 
 const MUMBAI_CHAIN = "mumbai";
 const POLYGON_CHAIN = "polygon";
+const CHAIN_NAME = MUMBAI_CHAIN;
 
 const HI_TOKEN_ID = 0;
 const LO_TOKEN_ID = 1;
+const HI_TOKEN_NAME = "Hi";
+const LO_TOKEN_NAME = "Lo";
 
-const HILO_CONTRACT_ADDRESS = "0x8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d";
+const HILO_CONTRACT_ADDRESS = "0xf8584b3Ae6f4254b476B71409eD89E108627AFb2";
 
 const USDC_ADDRESS = "0xe11A86849d99F524cAC3E7A0Ec1241828e332C62";
 
@@ -147,7 +150,10 @@ export default function Home() {
         ];
         const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
 
-        const allowance = await USDCContract.allowance(address, address);
+        const allowance = await USDCContract.allowance(
+          address,
+          contractAddress
+        );
         console.log("Allowance is:", utils.formatEther(allowance));
         if (allowance > 0) setPaymentApproved(true);
       } else {
@@ -172,7 +178,7 @@ export default function Home() {
 
         const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
 
-        const approved = await USDCContract.approve(address, amount);
+        const approved = await USDCContract.approve(contractAddress, amount);
         console.log("Got approval?", approved);
         if (approved) setPaymentApproved(true);
       } else {
@@ -183,22 +189,14 @@ export default function Home() {
     }
   };
 
-  // Buy a HI token
-  const buyHiHandler = async () => {
+  // Buy a token
+  const buyHandler = async (tokenId) => {
     try {
       if (walletConnected) {
-        const provider = await getProviderOrSigner(true);
+        const signer = await getProviderOrSigner(true);
+        const HILOContract = new Contract(contractAddress, contractABI, signer);
 
-        /*
-         * You're using contractABI here
-         */
-        const HILOContract = new Contract(
-          contractAddress,
-          contractABI,
-          provider
-        );
-
-        let buyTxn = await HILOContract.buy(HI_TOKEN_ID, hiPrice);
+        const buyTxn = await HILOContract.buy(tokenId);
         console.log("Bought tokenID %s", tokenId);
         console.log(buyTxn);
       } else {
@@ -209,9 +207,23 @@ export default function Home() {
     }
   };
 
-  const sellHiHandler = async () => {};
-  const buyLoHandler = async () => {};
-  const sellLoHandler = async () => {};
+  // Sell a token
+  const sellHandler = async (tokenId) => {
+    try {
+      if (walletConnected) {
+        const signer = await getProviderOrSigner(true);
+        const HILOContract = new Contract(contractAddress, contractABI, signer);
+
+        const sellTxn = await HILOContract.sell(tokenId);
+        console.log("Sold tokenID %s", tokenId);
+        console.log(sellTxn);
+      } else {
+        console.log("Wallet not connected!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
   useEffect(() => {
     // if wallet is not connected, create a new instance of Web3Modal
@@ -219,7 +231,7 @@ export default function Home() {
       // Assign the Web3Modal class to the reference object by setting it's `current` value
       // The `current` value is persisted throughout as long as this page is open
       web3ModalRef.current = new Web3Modal({
-        network: MUMBAI_CHAIN,
+        network: CHAIN_NAME,
         providerOptions: {},
         disableInjectedProvider: false,
       });
@@ -239,7 +251,7 @@ export default function Home() {
   }, [walletConnected]);
 
   // useEffect(() => {
-  //   // on page load, try to connect wallet
+  //   // on page load, try to connect wallet TODO
   // }, []);
 
   const renderConnectButton = () => {
@@ -310,20 +322,22 @@ export default function Home() {
           <Grid.Container gap={3} justify="center">
             <Grid xs={12} md={3}>
               {TokenCard(
-                "Hi",
+                HI_TOKEN_NAME,
+                HI_TOKEN_ID,
                 hiPrice,
-                buyHiHandler,
-                sellHiHandler,
+                buyHandler,
+                sellHandler,
                 hasHi,
                 !hasHi
               )}
             </Grid>
             <Grid xs={12} md={3}>
               {TokenCard(
-                "Lo",
+                LO_TOKEN_NAME,
+                LO_TOKEN_ID,
                 loPrice,
-                buyLoHandler,
-                sellLoHandler,
+                buyHandler,
+                sellHandler,
                 hasLo,
                 !hasLo
               )}

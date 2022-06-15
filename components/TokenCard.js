@@ -2,6 +2,7 @@ import { Card, Button, Text } from "@nextui-org/react";
 
 export const TokenCard = (
   tokenType,
+  tokenId,
   price,
   buy,
   sell,
@@ -16,10 +17,10 @@ export const TokenCard = (
     <Card.Divider />
     <Card.Footer css={{ justifyContent: "center" }}>
       <Button.Group color="gradient" size="md" ghost>
-        <Button onPress={buy} disabled={shouldDisableBuy}>
+        <Button onPress={() => buy(tokenId)} disabled={shouldDisableBuy}>
           <Text h3>Buy</Text>
         </Button>
-        <Button onPress={sell} disabled={shouldDisableSell}>
+        <Button onPress={() => sell(tokenId)} disabled={shouldDisableSell}>
           <Text h3>Sell</Text>
         </Button>
       </Button.Group>

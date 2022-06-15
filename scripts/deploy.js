@@ -12,6 +12,7 @@ async function main() {
   await token.deployed();
 
   console.log("Token deployed to:", token.address);
+  console.log("Don't forget to update HILOToken.json with the new ABI!");
 
   // After this finishes, run `npx hardhat verify ~token.address~ ~hiPrice~ ~loPrice~ ~buyCount~` to verify
 }

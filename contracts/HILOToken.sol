@@ -52,14 +52,16 @@ contract HILOToken is ERC1155, Ownable, Pausable {
     // mumbai: 0xe11A86849d99F524cAC3E7A0Ec1241828e332C62
     IERC20 public usdc;
 
-
     event hiDecreased(uint newHiPrice);
     event loIncreased(uint newLoPrice);
     event actionAdded(address player, uint tokenId, uint price);
     event pricesConverged(address[] winners, uint price);
 
-    constructor(uint _initialHi, uint _initialLo, uint _buyRequiredCount) ERC1155("") {
-
+    constructor(
+        uint _initialHi,
+        uint _initialLo,
+        uint _buyRequiredCount
+    ) ERC1155("") {
         // set the start prices
         initialHi = hiPrice = _initialHi;
         initialLo = loPrice = _initialLo;
@@ -108,12 +110,12 @@ contract HILOToken is ERC1155, Ownable, Pausable {
 
     function updateBuyCount(uint tokenId) private returns (bool) {
         // Update the count for the given token. return if the count should unlock
-        uint count = buyCounts[tokenId] + 1 % buyRequiredCount;
+        uint count = (buyCounts[tokenId] + 1) % buyRequiredCount;
         buyCounts[tokenId] = count;
         return count == 0;
     }
 
-    function addAction (address player, uint tokenId) private {
+    function addAction(address player, uint tokenId) private {
         uint price = getPrice(tokenId);
         Action memory action = Action(player, tokenId, price);
         actions[price].push(action);
@@ -142,7 +144,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
 
     event buyPriceCheck(address player, uint tokenId, uint price);
     event buyPriceUpdate(address player, uint tokenId);
-    
+
     // debugging
     event playerBalanceCheck(address player, uint balance);
     event playerPayment(address player, uint amount);
@@ -158,15 +160,21 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         require(tokenId == HI || tokenId == LO, "Invalid token.");
 
         // check the player does not have any tokens already
-        require(balanceOf(msg.sender, HI) == 0 && balanceOf(msg.sender, LO) == 0, "HILO: cannot have more than one token");
+        require(
+            balanceOf(msg.sender, HI) == 0 && balanceOf(msg.sender, LO) == 0,
+            "HILO: cannot have more than one token"
+        );
 
         // get price, if we are starting then update the price immediately
-        uint price = getPrice(tokenId);
+        uint price = getPrice(tokenId) * 1 ether;
         assert(price > 0);
         emit buyPriceCheck(msg.sender, tokenId, price);
 
         // update the price after the first buy so we can get the ball rolling
-        if ((price == initialLo && tokenId == LO) || (price == initialHi && tokenId == HI)) {
+        if (
+            (price == initialLo && tokenId == LO) ||
+            (price == initialHi && tokenId == HI)
+        ) {
             updatePrice(tokenId);
             emit buyPriceUpdate(msg.sender, tokenId);
         }
@@ -175,11 +183,10 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         uint playerBalance = usdc.balanceOf(msg.sender);
         emit playerBalanceCheck(msg.sender, playerBalance);
         require(playerBalance >= price, "Insufficient USDC balance.");
-        
 
         // get the money
-        // usdc.transferFrom(msg.sender, address(this), price);
-        // emit playerPayment(msg.sender, price);
+        usdc.transferFrom(msg.sender, address(this), price);
+        emit playerPayment(msg.sender, price);
 
         // mint the token for them
         _mint(msg.sender, tokenId, 1, "");
@@ -221,7 +228,10 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         require(tokenId == HI || tokenId == LO, "Invalid token.");
 
         // check if the player has any tokens
-        require(balanceOf(player, HI) == 0 && balanceOf(player, LO) == 0, "HILO: cannot sell when you have no tokens");
+        require(
+            balanceOf(player, HI) == 0 && balanceOf(player, LO) == 0,
+            "HILO: cannot sell when you have no tokens"
+        );
 
         // check the lock is open
         // if it isn't, add us to the queue
@@ -240,6 +250,9 @@ contract HILOToken is ERC1155, Ownable, Pausable {
             priceConverged(getPrice(tokenId));
         }
 
+        // if it's still going, update the price
+        updatePrice(tokenId);
+
         // send them LO if they sold HI
         if (tokenId == HI && balanceOf(player, LO) == 0) {
             _mint(player, LO, 1, "");
@@ -248,8 +261,18 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         }
     }
 
-    function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data) internal whenNotPaused override {
-        require(from == address(0) || from == address(this) || to == address(this), "HILOToken: non transferrable");
+    function _beforeTokenTransfer(
+        address operator,
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) internal override whenNotPaused {
+        require(
+            from == address(0) || from == address(this) || to == address(this),
+            "HILOToken: non transferrable"
+        );
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
 }
