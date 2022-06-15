@@ -9,41 +9,41 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 
 contract HILOToken is ERC1155, Ownable, Pausable {
-    uint public constant HI = 0;
-    uint public constant LO = 1;
+    uint256 public constant HI = 0;
+    uint256 public constant LO = 1;
 
     // the initial prices
-    uint private initialHi;
-    uint private initialLo;
+    uint256 private initialHi;
+    uint256 private initialLo;
 
     // the up-to-date prices
-    uint private hiPrice;
-    uint private loPrice;
+    uint256 private hiPrice;
+    uint256 private loPrice;
 
     // locks for tokens at price levels
     bool private hiLock;
     bool private loLock;
 
     // number of buys per price level
-    uint private buyRequiredCount;
+    uint256 private buyRequiredCount;
 
     // number of buys until sales are open
     // keep as a mapping so its easier to update
     // 0 => HI, 1 => LO
-    mapping(uint => uint) private buyCounts;
+    mapping(uint256 => uint256) private buyCounts;
 
     // queue for sales
     address[] private saleQueue;
-    uint private saleQueueIndex;
+    uint256 private saleQueueIndex;
 
     struct Action {
         address player;
-        uint tokenId;
-        uint price;
+        uint256 tokenId;
+        uint256 price;
     }
 
     // store transactions by price so we can pull it when they converge
-    mapping(uint => Action[]) private actions;
+    mapping(uint256 => Action[]) private actions;
 
     // the winners!
     address[] private winners;
@@ -52,15 +52,15 @@ contract HILOToken is ERC1155, Ownable, Pausable {
     // mumbai: 0xe11A86849d99F524cAC3E7A0Ec1241828e332C62
     IERC20 public usdc;
 
-    event hiDecreased(uint newHiPrice);
-    event loIncreased(uint newLoPrice);
-    event actionAdded(address player, uint tokenId, uint price);
-    event pricesConverged(address[] winners, uint price);
+    event hiDecreased(uint256 newHiPrice);
+    event loIncreased(uint256 newLoPrice);
+    event actionAdded(address player, uint256 tokenId, uint256 price);
+    event pricesConverged(address[] winners, uint256 price);
 
     constructor(
-        uint _initialHi,
-        uint _initialLo,
-        uint _buyRequiredCount
+        uint256 _initialHi,
+        uint256 _initialLo,
+        uint256 _buyRequiredCount
     ) ERC1155("") {
         // set the start prices
         initialHi = hiPrice = _initialHi;
@@ -78,7 +78,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         usdc = IERC20(0xe11A86849d99F524cAC3E7A0Ec1241828e332C62);
     }
 
-    function getPrice(uint tokenId) public view returns (uint) {
+    function getPrice(uint256 tokenId) public view returns (uint256) {
         if (tokenId == HI) {
             return hiPrice;
         } else if (tokenId == LO) {
@@ -88,7 +88,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         }
     }
 
-    function updatePrice(uint tokenId) private {
+    function updatePrice(uint256 tokenId) private {
         if (tokenId == HI) {
             decreaseHiPrice();
         } else {
@@ -108,24 +108,24 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         emit loIncreased(loPrice);
     }
 
-    function updateBuyCount(uint tokenId) private returns (bool) {
+    function updateBuyCount(uint256 tokenId) private returns (bool) {
         // Update the count for the given token. return if the count should unlock
-        uint count = (buyCounts[tokenId] + 1) % buyRequiredCount;
+        uint256 count = (buyCounts[tokenId] + 1) % buyRequiredCount;
         buyCounts[tokenId] = count;
         return count == 0;
     }
 
-    function addAction(address player, uint tokenId) private {
-        uint price = getPrice(tokenId);
+    function addAction(address player, uint256 tokenId) private {
+        uint256 price = getPrice(tokenId);
         Action memory action = Action(player, tokenId, price);
         actions[price].push(action);
         emit actionAdded(player, tokenId, price);
     }
 
-    function priceConverged(uint price) private {
+    function priceConverged(uint256 price) private {
         // get the winners
         Action[] memory wins = actions[hiPrice]; // which price doesn't matter; they converged
-        for (uint i = 0; i < wins.length; i++) {
+        for (uint256 i = 0; i < wins.length; i++) {
             winners.push(wins[i].player);
         }
 
@@ -137,22 +137,22 @@ contract HILOToken is ERC1155, Ownable, Pausable {
 
         console.log("Game over! The prices converged at:", price);
         console.log("The winners are:");
-        for (uint i = 0; i < winners.length; i++) {
+        for (uint256 i = 0; i < winners.length; i++) {
             console.log(winners[i]);
         }
     }
 
-    event buyPriceCheck(address player, uint tokenId, uint price);
-    event buyPriceUpdate(address player, uint tokenId);
+    event buyPriceCheck(address player, uint256 tokenId, uint256 price);
+    event buyPriceUpdate(address player, uint256 tokenId);
 
     // debugging
-    event playerBalanceCheck(address player, uint balance);
-    event playerPayment(address player, uint amount);
-    event tokenMinted(address player, uint tokenId);
-    event shouldUnlockCheck(uint tokenId, bool shouldUnlock);
-    event saleUnlocked(uint tokenId);
+    event playerBalanceCheck(address player, uint256 balance);
+    event playerPayment(address player, uint256 amount);
+    event tokenMinted(address player, uint256 tokenId);
+    event shouldUnlockCheck(uint256 tokenId, bool shouldUnlock);
+    event saleUnlocked(uint256 tokenId);
 
-    function buy(uint tokenId) public {
+    function buy(uint256 tokenId) public {
         // check if paused
         require(!paused(), "Game is paused.");
 
@@ -165,8 +165,8 @@ contract HILOToken is ERC1155, Ownable, Pausable {
             "HILO: cannot have more than one token"
         );
 
-        // get price, if we are starting then update the price immediately
-        uint price = getPrice(tokenId) * 1 ether;
+        // get price, we store as ints so multiply by 1 ether for the 18 decimals
+        uint256 price = getPrice(tokenId) * 1 ether;
         assert(price > 0);
         emit buyPriceCheck(msg.sender, tokenId, price);
 
@@ -180,7 +180,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         }
 
         // check if the player has enough to buy
-        uint playerBalance = usdc.balanceOf(msg.sender);
+        uint256 playerBalance = usdc.balanceOf(msg.sender);
         emit playerBalanceCheck(msg.sender, playerBalance);
         require(playerBalance >= price, "Insufficient USDC balance.");
 
@@ -213,14 +213,14 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         }
     }
 
-    function sell(uint tokenId) public {
+    function sell(uint256 tokenId) public {
         // this is because we want to sell from the queue sometimes.
         // TBD if this will actually work, since we aren't signing the transaction
         address player = msg.sender;
         _sell(player, tokenId);
     }
 
-    function _sell(address player, uint tokenId) private {
+    function _sell(address player, uint256 tokenId) private {
         // check if paused
         require(!paused(), "Game is paused.");
 
@@ -229,7 +229,8 @@ contract HILOToken is ERC1155, Ownable, Pausable {
 
         // check if the player has any tokens
         require(
-            balanceOf(player, HI) == 0 && balanceOf(player, LO) == 0,
+            (tokenId == HI && balanceOf(player, HI) > 0) ||
+                (tokenId == LO && balanceOf(player, LO) > 0),
             "HILO: cannot sell when you have no tokens"
         );
 
@@ -239,7 +240,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         addAction(player, tokenId);
 
         // pay them
-        uint price = getPrice(tokenId);
+        uint256 price = getPrice(tokenId) * 1 ether;
         usdc.transfer(player, price);
 
         // burn the token
@@ -250,7 +251,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
             priceConverged(getPrice(tokenId));
         }
 
-        // if it's still going, update the price
+        // but if it's still going, update the price
         updatePrice(tokenId);
 
         // send them LO if they sold HI

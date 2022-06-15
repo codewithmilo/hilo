@@ -25,6 +25,9 @@ const LO_TOKEN_ID = 1;
 const HI_TOKEN_NAME = "Hi";
 const LO_TOKEN_NAME = "Lo";
 
+// The highest possible price in the game, for pre-approval
+const MAX_APPROVAL_AMOUNT = 1000;
+
 const HILO_CONTRACT_ADDRESS = "0xf8584b3Ae6f4254b476B71409eD89E108627AFb2";
 
 const USDC_ADDRESS = "0xe11A86849d99F524cAC3E7A0Ec1241828e332C62";
@@ -164,17 +167,17 @@ export default function Home() {
     }
   };
 
-  // Pre-approve payments for USDC (when button is clicked)
-  const approvePayments = async () => {
+  // Approve payments for USDC (when button is clicked)
+  // default to the max possible in the game if not specified
+  const approvePayments = async (_amount = MAX_APPROVAL_AMOUNT) => {
     try {
       if (walletConnected && !paymentApproved) {
         const signer = await getProviderOrSigner(true);
-        const address = await signer.getAddress();
         const usdcABI = [
           "function approve(address _spender, uint256 _value) public returns (bool success)",
         ];
-        // pre-approval for the max Hi
-        const amount = utils.parseUnits("1000", 18);
+
+        const amount = utils.parseUnits(_amount.toString(), 18);
 
         const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
 
@@ -189,8 +192,25 @@ export default function Home() {
     }
   };
 
+  const checkApprovalAndPossiblyApprove = async (tokenId) => {
+    try {
+      // this will set paymentApproved
+      checkApproval();
+
+      if (paymentApproved) return; // we are good to go, nothing to do
+
+      // we need to ask the user to approve the payment
+      // add one if it's LO, in case the price updates while purchasing
+      const amount = tokenId === LO_TOKEN_ID ? loPrice + 1 : hiPrice;
+      approvePayments(amount);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   // Buy a token
   const buyHandler = async (tokenId) => {
+    await checkApprovalAndPossiblyApprove(tokenId);
     try {
       if (walletConnected) {
         const signer = await getProviderOrSigner(true);
@@ -209,6 +229,7 @@ export default function Home() {
 
   // Sell a token
   const sellHandler = async (tokenId) => {
+    await checkApprovalAndPossiblyApprove();
     try {
       if (walletConnected) {
         const signer = await getProviderOrSigner(true);
@@ -320,25 +341,25 @@ export default function Home() {
 
           {/* Show the two tokens */}
           <Grid.Container gap={3} justify="center">
-            <Grid xs={12} md={3}>
+            <Grid xs={10} sm={6} md={4}>
               {TokenCard(
                 HI_TOKEN_NAME,
                 HI_TOKEN_ID,
                 hiPrice,
                 buyHandler,
                 sellHandler,
-                hasHi,
+                hasHi || hasLo,
                 !hasHi
               )}
             </Grid>
-            <Grid xs={12} md={3}>
+            <Grid xs={10} sm={6} md={4}>
               {TokenCard(
                 LO_TOKEN_NAME,
                 LO_TOKEN_ID,
                 loPrice,
                 buyHandler,
                 sellHandler,
-                hasLo,
+                hasLo || hasHi,
                 !hasLo
               )}
             </Grid>
