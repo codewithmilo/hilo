@@ -8,25 +8,6 @@
   cursor: pointer;
 }
 
-.description {
-  padding: 20px !important;
-}
-.description p {
-  font-size: 1.5rem;
-  text-align: center;
-}
-
-@media screen and (min-width: 950px) {
-  .description {
-    max-width: 600px;
-    margin: 0 auto !important;
-  }
-}
-
-.tokenCard {
-  text-align: center !important;
-}
-
 .footer {
   position: absolute;
   bottom: 0;

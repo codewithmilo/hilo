@@ -7,22 +7,22 @@ import { providers, Contract, utils } from "ethers";
 
 import abi from "../src/HILOToken.json";
 
-import {
-  Container,
-  Text,
-  Spacer,
-  Grid,
-  Card,
-  Button,
-  Modal,
-} from "@nextui-org/react";
+import { Container, Text, Spacer, Grid, Button } from "@nextui-org/react";
+import { TokenCard } from "../components/TokenCard";
+import { HowToPlayModal } from "../components/HowToPlayModal";
+import { ConfirmApproveModal } from "../components/ConfirmApproveModal";
 
 const POLYGON_CHAIN_ID = 137;
 const MUMBAI_CHAIN_ID = 80001;
 const CHAIN_ID = MUMBAI_CHAIN_ID;
 
+const MUMBAI_CHAIN = "mumbai";
+const POLYGON_CHAIN = "polygon";
+
 const HI_TOKEN_ID = 0;
 const LO_TOKEN_ID = 1;
+
+const HILO_CONTRACT_ADDRESS = "0x8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d";
 
 const USDC_ADDRESS = "0xe11A86849d99F524cAC3E7A0Ec1241828e332C62";
 
@@ -37,17 +37,19 @@ export default function Home() {
   const [hiPrice, setHiPrice] = useState(0);
   const [loPrice, setLoPrice] = useState(0);
 
+  // keep track of whether the player has these tokens
   const [hasHi, setHasHi] = useState(false);
   const [hasLo, setHasLo] = useState(false);
 
+  // detail modals, how to play and pre-approval description
   const [howToVisible, setHowToVisible] = useState(false);
-
   const [approveModalVisible, setApproveModalVisible] = useState(false);
 
   // Create a reference to the Web3 Modal (used for connecting to Metamask) which persists as long as the page is open
   const web3ModalRef = useRef();
 
-  const contractAddress = "0x4A2ad292A7989Cc10b64B8106d51776B5aC3BED0";
+  // The HILO contract
+  const contractAddress = HILO_CONTRACT_ADDRESS;
   const contractABI = abi.abi;
 
   const getProviderOrSigner = async (needSigner = false) => {
@@ -79,127 +81,7 @@ export default function Home() {
     }
   };
 
-  const checkApproval = async () => {
-    try {
-      if (walletConnected) {
-        const signer = await getProviderOrSigner(true);
-        const address = await signer.getAddress();
-        const usdcABI = [
-          "function allowance(address owner, address spender) external view returns (uint256)",
-        ];
-        const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
-
-        const allowance = await USDCContract.allowance(address, address);
-        console.log("Allowance is:", utils.formatEther(allowance));
-        if (allowance > 0) setPaymentApproved(true);
-      } else {
-        console.log("Couldn't get allowance");
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const approvePayments = async () => {
-    try {
-      if (walletConnected && !paymentApproved) {
-        const signer = await getProviderOrSigner(true);
-        const address = await signer.getAddress();
-        const usdcABI = [
-          "function approve(address _spender, uint256 _value) public returns (bool success)",
-        ];
-        // pre-approval for the max Hi
-        const amount = utils.parseUnits("1000", 18);
-
-        const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
-
-        const approved = await USDCContract.approve(address, amount);
-        console.log("Got approval?", approved);
-        if (approved) setPaymentApproved(true);
-      } else {
-        console.log("Didn't approve!");
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const renderConnectButton = () => {
-    if (walletConnected) {
-      return null;
-    } else {
-      return (
-        <Button
-          color="gradient"
-          size="lg"
-          css={{ maxWidth: "200px", margin: "0 auto" }}
-          onPress={connectWallet}
-        >
-          Connect wallet to play
-        </Button>
-      );
-    }
-  };
-
-  const renderApproveButton = () => {
-    if (walletConnected) {
-      if (!paymentApproved) {
-        return (
-          <>
-            <Button
-              color="gradient"
-              size="lg"
-              css={{ maxWidth: "200px", margin: "0 auto" }}
-              onPress={() => setApproveModalVisible(true)}
-            >
-              Pre-approve payments
-            </Button>
-            <Modal
-              blur
-              aria-labelledby="modal-title"
-              aria-describedby="modal-description"
-              onClose={() => setApproveModalVisible(false)}
-              open={approveModalVisible}
-            >
-              <Modal.Header>
-                <Text id="modal-title" h2>
-                  Pre-approve payments
-                </Text>
-              </Modal.Header>
-              <Modal.Body>
-                <Text id="modal-description" size="1.3rem">
-                  This will ask you to approve payments up to $1,000 but you
-                  will only ever be charged at the shown price at the time of
-                  purchase. You will not need to approve payments again.
-                </Text>
-                <br />
-                <Text size="1.3rem">
-                  If you would like to wait to approve the exact amount at
-                  purchase, you can simply do so when you get to it.
-                </Text>
-              </Modal.Body>
-              <Modal.Footer>
-                <Button
-                  auto
-                  flat
-                  color="error"
-                  onClick={() => setApproveModalVisible(false)}
-                >
-                  <Text h4>Cancel</Text>
-                </Button>
-                <Button auto onClick={approvePayments}>
-                  <Text h4>Approve</Text>
-                </Button>
-              </Modal.Footer>
-            </Modal>
-          </>
-        );
-      }
-    }
-
-    return null;
-  };
-
+  // Get the token prices (done at page load + any update events)
   const getPrice = async (tokenId) => {
     try {
       if (walletConnected) {
@@ -226,6 +108,7 @@ export default function Home() {
     }
   };
 
+  // Get the player's token balance (done at page load + buy/sell actions)
   const getBalance = async (tokenId) => {
     try {
       if (walletConnected) {
@@ -253,10 +136,54 @@ export default function Home() {
     }
   };
 
-  const toggleHowTo = () => {
-    setHowToVisible(!howToVisible);
+  // Check if the user has given payment approval (done at page load)
+  const checkApproval = async () => {
+    try {
+      if (walletConnected) {
+        const signer = await getProviderOrSigner(true);
+        const address = await signer.getAddress();
+        const usdcABI = [
+          "function allowance(address owner, address spender) external view returns (uint256)",
+        ];
+        const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
+
+        const allowance = await USDCContract.allowance(address, address);
+        console.log("Allowance is:", utils.formatEther(allowance));
+        if (allowance > 0) setPaymentApproved(true);
+      } else {
+        console.log("Couldn't get allowance");
+      }
+    } catch (error) {
+      console.log(error);
+    }
   };
 
+  // Pre-approve payments for USDC (when button is clicked)
+  const approvePayments = async () => {
+    try {
+      if (walletConnected && !paymentApproved) {
+        const signer = await getProviderOrSigner(true);
+        const address = await signer.getAddress();
+        const usdcABI = [
+          "function approve(address _spender, uint256 _value) public returns (bool success)",
+        ];
+        // pre-approval for the max Hi
+        const amount = utils.parseUnits("1000", 18);
+
+        const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
+
+        const approved = await USDCContract.approve(address, amount);
+        console.log("Got approval?", approved);
+        if (approved) setPaymentApproved(true);
+      } else {
+        console.log("Didn't approve!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // Buy a HI token
   const buyHiHandler = async () => {
     try {
       if (walletConnected) {
@@ -292,7 +219,7 @@ export default function Home() {
       // Assign the Web3Modal class to the reference object by setting it's `current` value
       // The `current` value is persisted throughout as long as this page is open
       web3ModalRef.current = new Web3Modal({
-        network: "mumbai",
+        network: MUMBAI_CHAIN,
         providerOptions: {},
         disableInjectedProvider: false,
       });
@@ -311,6 +238,54 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletConnected]);
 
+  // useEffect(() => {
+  //   // on page load, try to connect wallet
+  // }, []);
+
+  const renderConnectButton = () => {
+    if (walletConnected) {
+      return null;
+    } else {
+      return (
+        <Button
+          color="gradient"
+          size="lg"
+          css={{ maxWidth: "200px", margin: "0 auto" }}
+          onPress={connectWallet}
+        >
+          Connect wallet to play
+        </Button>
+      );
+    }
+  };
+
+  const renderApproveButton = () => {
+    if (walletConnected) {
+      if (!paymentApproved) {
+        return (
+          <>
+            <Button
+              color="gradient"
+              size="lg"
+              css={{ maxWidth: "200px", margin: "0 auto" }}
+              onPress={() => setApproveModalVisible(true)}
+            >
+              Pre-approve payments
+            </Button>
+            <Spacer y={1} />
+            {ConfirmApproveModal(
+              approveModalVisible,
+              setApproveModalVisible,
+              approvePayments
+            )}
+          </>
+        );
+      }
+    }
+
+    return null;
+  };
+
   return (
     <Container fluid css={{ minHeight: "100vh", position: "relative" }}>
       <Text h1 size="8rem" className={styles.title}>
@@ -323,12 +298,18 @@ export default function Home() {
 
       <Spacer y={2} />
 
-      {walletConnected ? (
+      {/* If wallet isn't connected, show the button. Otherwise show the game */}
+      {!walletConnected ? (
+        renderConnectButton()
+      ) : (
         <>
+          {/* If payment is not approved, show the button */}
           {!paymentApproved && renderApproveButton()}
+
+          {/* Show the two tokens */}
           <Grid.Container gap={3} justify="center">
-            <Grid xs={4}>
-              {tokenCard(
+            <Grid xs={12} md={3}>
+              {TokenCard(
                 "Hi",
                 hiPrice,
                 buyHiHandler,
@@ -337,8 +318,8 @@ export default function Home() {
                 !hasHi
               )}
             </Grid>
-            <Grid xs={4}>
-              {tokenCard(
+            <Grid xs={12} md={3}>
+              {TokenCard(
                 "Lo",
                 loPrice,
                 buyLoHandler,
@@ -349,19 +330,18 @@ export default function Home() {
             </Grid>
           </Grid.Container>
         </>
-      ) : (
-        renderConnectButton()
       )}
 
       <Spacer y={4} />
 
-      <Text size="1.8rem" className={styles.howTo} onClick={toggleHowTo}>
+      <Text
+        size="1.8rem"
+        className={styles.howTo}
+        onClick={() => setHowToVisible(true)}
+      >
         How to play
       </Text>
-
-      <Spacer y={1} />
-
-      {howToVisible && howToDescription}
+      {HowToPlayModal(howToVisible, setHowToVisible)}
 
       <Spacer y={6} />
 
@@ -377,67 +357,3 @@ export default function Home() {
     </Container>
   );
 }
-
-const tokenCard = (
-  tokenType,
-  price,
-  buy,
-  sell,
-  shouldDisableBuy,
-  shouldDisableSell
-) => (
-  <Card variant="bordered">
-    <Card.Body className={styles.tokenCard}>
-      <Text h1>{tokenType}</Text>
-      <Text h2>${price}</Text>
-    </Card.Body>
-    <Card.Divider />
-    <Card.Footer css={{ justifyContent: "center" }}>
-      <Button.Group color="gradient" size="md" ghost>
-        <Button onPress={buy} disabled={shouldDisableBuy}>
-          <Text h3>Buy</Text>
-        </Button>
-        <Button onPress={sell} disabled={shouldDisableSell}>
-          <Text h3>Sell</Text>
-        </Button>
-      </Button.Group>
-    </Card.Footer>
-  </Card>
-);
-
-const howToDescription = (
-  <Card variant="flat" className={styles.description}>
-    <Card.Body>
-      <Text size="1.5rem">
-        Buy a <b>Hi</b> or <b>Lo</b> token (with USDC)
-        <br />
-        <b>Lo</b> starts at <b>$1</b>
-        <br />
-        <b>Hi</b> starts at <b>$1,000</b>
-      </Text>
-      <Text size="1.5rem">
-        If there are two buys of a single token
-        <br />
-        <b>Lo</b> increases by <b>$1 // Hi</b> decreases by <b>$1</b>
-      </Text>
-      <br />
-      <Text>
-        Sell back a <b>Lo</b> to get a profit after the price has increased
-        <br />
-        Sell back a <b>Hi</b> to get a free <b>Lo</b> token
-      </Text>
-      <br />
-      <Text>
-        When the prices converge—a <b>Hi</b> and <b>Lo</b> are both sold for the
-        same price—<b>the game is over</b>
-        <br />
-        The two winners who sold split the jackpot of <b>$100,000</b>
-        <br />
-      </Text>
-      <br />
-      <Text size="1.5rem" css={{ textAlign: "center" }}>
-        Good luck!
-      </Text>
-    </Card.Body>
-  </Card>
-);
