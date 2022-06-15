@@ -79,6 +79,27 @@ export default function Home() {
     }
   };
 
+  const checkApproval = async () => {
+    try {
+      if (walletConnected) {
+        const signer = await getProviderOrSigner(true);
+        const address = await signer.getAddress();
+        const usdcABI = [
+          "function allowance(address owner, address spender) external view returns (uint256)",
+        ];
+        const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
+
+        const allowance = await USDCContract.allowance(address, address);
+        console.log("Allowance is:", utils.formatEther(allowance));
+        if (allowance > 0) setPaymentApproved(true);
+      } else {
+        console.log("Couldn't get allowance");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   const approvePayments = async () => {
     try {
       if (walletConnected && !paymentApproved) {
@@ -283,6 +304,9 @@ export default function Home() {
       // then check if the user has any tokens
       getBalance(HI_TOKEN_ID);
       getBalance(LO_TOKEN_ID);
+
+      // check if we're approved to make payments
+      checkApproval();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletConnected]);
