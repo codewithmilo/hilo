@@ -165,8 +165,8 @@ contract HILOToken is ERC1155, Ownable, Pausable {
             "HILO: cannot have more than one token"
         );
 
-        // get price, we store as ints so multiply by 1 ether for the 18 decimals
-        uint256 price = getPrice(tokenId) * 1 ether;
+        // get price
+        uint256 price = getPrice(tokenId);
         assert(price > 0);
         emit buyPriceCheck(msg.sender, tokenId, price);
 
@@ -180,6 +180,9 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         }
 
         // check if the player has enough to buy
+        // change to gwei here as we are dealing with tokens
+        price = price * 1 ether;
+
         uint256 playerBalance = usdc.balanceOf(msg.sender);
         emit playerBalanceCheck(msg.sender, playerBalance);
         require(playerBalance >= price, "Insufficient USDC balance.");
@@ -235,9 +238,17 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         );
 
         // check the lock is open
-        // if it isn't, add us to the queue
+        bool isLocked = buyCounts[tokenId] == 1;
+        require(!isLocked, "HILO: cannot sell when the sale is locked");
+        // TODO if it isn't, add us to the queue
+
         // add the action
         addAction(player, tokenId);
+
+        // end game if the prices converged
+        if (hiPrice == loPrice) {
+            priceConverged(getPrice(tokenId));
+        }
 
         // pay them
         uint256 price = getPrice(tokenId) * 1 ether;
@@ -246,12 +257,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         // burn the token
         _burn(player, tokenId, 1);
 
-        // end game if the prices converged
-        if (hiPrice == loPrice) {
-            priceConverged(getPrice(tokenId));
-        }
-
-        // but if it's still going, update the price
+        // if the game is still going, update the price
         updatePrice(tokenId);
 
         // send them LO if they sold HI
@@ -270,8 +276,12 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         uint256[] memory amounts,
         bytes memory data
     ) internal override whenNotPaused {
+        // Minting, burning, or to/from HILO. No player transfers allowed
         require(
-            from == address(0) || from == address(this) || to == address(this),
+            from == address(0) ||
+                to == address(0) ||
+                from == address(this) ||
+                to == address(this),
             "HILOToken: non transferrable"
         );
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);

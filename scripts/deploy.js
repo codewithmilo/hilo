@@ -13,6 +13,7 @@ async function main() {
 
   console.log("Token deployed to:", token.address);
   console.log("Don't forget to update HILOToken.json with the new ABI!");
+  console.log("And then, update index.js with the new contract address!");
 
   // After this finishes, run `npx hardhat verify ~token.address~ ~hiPrice~ ~loPrice~ ~buyCount~` to verify
 }

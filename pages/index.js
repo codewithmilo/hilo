@@ -3,7 +3,7 @@ import Head from "next/head";
 import styles from "../styles/Home.module.css";
 
 import Web3Modal from "web3modal";
-import { providers, Contract, utils, getDefaultProvider } from "ethers";
+import { providers, Contract, utils } from "ethers";
 
 import abi from "../src/HILOToken.json";
 
@@ -28,7 +28,7 @@ const LO_TOKEN_NAME = "Lo";
 // The highest possible price in the game, for pre-approval
 const MAX_APPROVAL_AMOUNT = 1000;
 
-const HILO_CONTRACT_ADDRESS = "0xf8584b3Ae6f4254b476B71409eD89E108627AFb2";
+const HILO_CONTRACT_ADDRESS = "0xd9876325C9930B9615b03840C372BCE752205C9b";
 
 const USDC_ADDRESS = "0xe11A86849d99F524cAC3E7A0Ec1241828e332C62";
 
@@ -169,14 +169,14 @@ export default function Home() {
 
   // Approve payments for USDC (when button is clicked)
   // default to the max possible in the game if not specified
-  const approvePayments = async (_amount = MAX_APPROVAL_AMOUNT) => {
+  const approvePayments = async (e, _amount = MAX_APPROVAL_AMOUNT) => {
     try {
       if (walletConnected && !paymentApproved) {
         const signer = await getProviderOrSigner(true);
         const usdcABI = [
           "function approve(address _spender, uint256 _value) public returns (bool success)",
         ];
-
+        console.log(_amount, _amount.toString());
         const amount = utils.parseUnits(_amount.toString(), 18);
 
         const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
@@ -202,7 +202,7 @@ export default function Home() {
       // we need to ask the user to approve the payment
       // add one if it's LO, in case the price updates while purchasing
       const amount = tokenId === LO_TOKEN_ID ? loPrice + 1 : hiPrice;
-      approvePayments(amount);
+      approvePayments(null, amount);
     } catch (error) {
       console.log(error);
     }
