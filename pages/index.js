@@ -42,9 +42,19 @@ const HILO_CONTRACT_ADDRESS = "0xdFe7BB50ea729aBA877e4AcdF0548175240CB82D";
 
 const USDC_ADDRESS = "0xe11A86849d99F524cAC3E7A0Ec1241828e332C62";
 
+let web3Modal;
+if (typeof window !== "undefined") {
+  web3Modal = new Web3Modal({
+    network: CHAIN_NAME,
+    providerOptions: {},
+    theme: "dark",
+    cacheProvider: true,
+  });
+}
+
 export default function Home() {
-  // keep track of whether the user's wallet is connected or not
-  const [walletConnected, setWalletConnected] = useState(false);
+  // the wallet provider
+  const [provider, setProvider] = useState(null);
 
   // keep track of whether the user has given payment approval or not
   const [paymentApproved, setPaymentApproved] = useState(false);
@@ -81,79 +91,56 @@ export default function Home() {
   // error
   const [error, setError] = useState(null);
 
-  // Create a reference to the Web3 Modal (used for connecting to Metamask) which persists as long as the page is open
-  const web3ModalRef = useRef();
-
   // The HILO contract
   const contractAddress = HILO_CONTRACT_ADDRESS;
   const contractABI = abi.abi;
 
-  const getProviderOrSigner = async (needSigner = false) => {
-    const provider = await web3ModalRef.current.connect();
-    const web3Provider = new providers.Web3Provider(provider);
-
-    // If user is not connected to the Polygon/Mumbai network, let them know and throw an error
-    const { chainId } = await web3Provider.getNetwork();
-    if (chainId !== CHAIN_ID) {
-      window.alert("Change the network to Polygon");
-      throw new Error("Change network to Polygon");
-    }
-
-    if (needSigner) {
-      const signer = web3Provider.getSigner();
-      return signer;
-    }
-    return web3Provider;
-  };
-
   const connectWallet = async () => {
-    try {
-      // Get the provider from web3Modal
-      // When used for the first time, it prompts the user to connect their wallet
-      await getProviderOrSigner();
-      setWalletConnected(true);
-    } catch (err) {
-      console.error(err);
-    }
+    await web3Modal
+      .connect()
+      .then((instance) => {
+        const web3Provider = new providers.Web3Provider(instance);
+        setProvider(web3Provider);
+        return web3Provider;
+      })
+      .then(async (web3Provider) => {
+        // If user is not connected to the Polygon/Mumbai network, let them know and throw an error
+        const { chainId } = await web3Provider.getNetwork();
+        if (chainId !== CHAIN_ID) {
+          window.alert("Change the network to Polygon");
+          throw new Error("Change network to Polygon");
+        }
+      })
+      .catch((err) => console.log(err));
   };
 
   // Get the token prices (done at page load + any update events)
   const getPrice = async (tokenId) => {
-    try {
-      if (walletConnected) {
-        const provider = await getProviderOrSigner();
+    const HILOContract = new Contract(contractAddress, contractABI, provider);
 
-        const HILOContract = new Contract(
-          contractAddress,
-          contractABI,
-          provider
-        );
-
-        const price = await HILOContract.getPrice(tokenId);
+    await HILOContract.getPrice(tokenId)
+      .then((price) => {
         console.log("Got price for tokenID %s: %s", tokenId, price.toNumber());
         if (tokenId === HI_TOKEN_ID) {
           setHiPrice(price.toNumber());
         } else {
           setLoPrice(price.toNumber());
         }
-      } else {
-        console.log("Wallet not connected!");
-      }
-    } catch (error) {
-      console.log(error);
-    }
+      })
+      .catch((err) => {
+        console.log(err);
+      });
   };
 
   // Get the player's token balance (done at page load + buy/sell actions)
   const getBalance = async (tokenId) => {
-    try {
-      if (walletConnected) {
-        const signer = await getProviderOrSigner(true);
-        const address = await signer.getAddress();
+    const signer = provider.getSigner();
+    const address = await signer.getAddress();
 
-        const HILOContract = new Contract(contractAddress, contractABI, signer);
+    const HILOContract = new Contract(contractAddress, contractABI, signer);
 
-        const balance = await HILOContract.balanceOf(address, tokenId);
+    await HILOContract.balanceOf(address, tokenId)
+      .then((balance) => {
         console.log(
           "Got balance for tokenID %s: %s",
           tokenId,
@@ -164,17 +151,13 @@ export default function Home() {
         } else {
           setHasLo(balance.toNumber() > 0);
         }
-      } else {
-        console.log("Wallet not connected!");
-      }
-    } catch (error) {
-      console.log(error);
-    }
+      })
+      .catch((err) => console.log(err));
   };
 
   // Check if the user has given payment approval
   const checkApproval = async (amount = MAX_APPROVAL_AMOUNT) => {
-    const signer = await getProviderOrSigner(true);
+    const signer = provider.getSigner();
     const address = await signer.getAddress();
     const usdcABI = [
       "function allowance(address owner, address spender) external view returns (uint256)",
@@ -220,8 +203,7 @@ export default function Home() {
     // Show in the UI
     setPendingApproveAmount(_amount);
 
-    const provider = await getProviderOrSigner();
-    const signer = await getProviderOrSigner(true);
+    const signer = provider.getSigner();
     const usdcABI = [
       "function approve(address _spender, uint256 _value) public returns (bool success)",
     ];
@@ -261,66 +243,51 @@ export default function Home() {
   // Buy a token
   const buyHandler = async (tokenId) => {
     tokenId == HI_TOKEN_ID ? setHiBuyLoading(true) : setLoBuyLoading(true);
-    const provider = await getProviderOrSigner();
+    checkApprovalAndPossiblyApprove(tokenId)
+      .then(async () => {
+        setPendingTokenBuy(tokenId);
+        const signer = provider.getSigner();
+        const HILOContract = new Contract(contractAddress, contractABI, signer);
+        await HILOContract.buy(tokenId);
+      })
+      .then((txn) => provider.waitForTransaction(txn.hash))
+      .then((receipt) => {
+        console.log("Bought tokenID %s", tokenId);
+        console.log(receipt);
 
-    if (walletConnected) {
-      checkApprovalAndPossiblyApprove(tokenId)
-        .then(async () => {
-          setPendingTokenBuy(tokenId);
-          const signer = await getProviderOrSigner(true);
-          const HILOContract = new Contract(
-            contractAddress,
-            contractABI,
-            signer
-          );
-          await HILOContract.buy(tokenId);
-        })
-        .then((txn) => provider.waitForTransaction(txn.hash))
-        .then((receipt) => {
-          console.log("Bought tokenID %s", tokenId);
-          console.log(receipt);
+        setBuySuccess(true);
+        setPendingTokenBuy(null);
+        tokenId == HI_TOKEN_ID
+          ? setHiBuyLoading(false)
+          : setLoBuyLoading(false);
 
-          setBuySuccess(true);
-          setPendingTokenBuy(null);
-          tokenId == HI_TOKEN_ID
-            ? setHiBuyLoading(false)
-            : setLoBuyLoading(false);
-
-          updateGameState();
-        })
-        .catch((err) => setErrorAndClearLoading(err));
-    } else {
-      console.log("Wallet not connected!");
-    }
+        updateGameState();
+      })
+      .catch((err) => setErrorAndClearLoading(err));
   };
 
   // Sell a token
   const sellHandler = async (tokenId) => {
     tokenId == HI_TOKEN_ID ? setHiSellLoading(true) : setLoSellLoading(true);
-    const provider = getProviderOrSigner();
 
-    if (walletConnected) {
-      setPendingTokenSell(tokenId);
-      const signer = await getProviderOrSigner(true);
-      const HILOContract = new Contract(contractAddress, contractABI, signer);
+    setPendingTokenSell(tokenId);
+    const signer = provider.getSigner();
+    const HILOContract = new Contract(contractAddress, contractABI, signer);
 
-      await HILOContract.sell(tokenId)
-        .then((txn) => provider.waitForTransaction(txn.hash))
-        .then((receipt) => {
-          console.log("Sold tokenID %s", tokenId);
-          console.log(receipt);
+    await HILOContract.sell(tokenId)
+      .then((txn) => provider.waitForTransaction(txn.hash))
+      .then((receipt) => {
+        console.log("Sold tokenID %s", tokenId);
+        console.log(receipt);
 
-          setSellSuccess(true);
-          setPendingTokenSell(null);
-          tokenId == HI_TOKEN_ID
-            ? setHiSellLoading(false)
-            : setLoSellLoading(false);
-          updateGameState();
-        })
-        .catch((err) => setErrorAndClearLoading(err));
-    } else {
-      console.log("Wallet not connected!");
-    }
+        setSellSuccess(true);
+        setPendingTokenSell(null);
+        tokenId == HI_TOKEN_ID
+          ? setHiSellLoading(false)
+          : setLoSellLoading(false);
+        updateGameState();
+      })
+      .catch((err) => setErrorAndClearLoading(err));
   };
 
   const setErrorAndClearLoading = (error) => {
@@ -351,31 +318,35 @@ export default function Home() {
   };
 
   // When we connect!
-  useEffect(() => {
-    // if wallet is not connected, create a new instance of Web3Modal
-    if (!walletConnected) {
-      // Assign the Web3Modal class to the reference object by setting it's `current` value
-      // The `current` value is persisted throughout as long as this page is open
-      web3ModalRef.current = new Web3Modal({
-        network: CHAIN_NAME,
-        providerOptions: {},
-        disableInjectedProvider: false,
-        theme: "dark",
-      });
-    } else {
-      // if wallet is connected, get the game state
-      updateGameState();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletConnected]);
+  // useEffect(() => {
+  //   // if wallet is not connected, create a new instance of Web3Modal
+  //   if (!walletConnected) {
+  //     // Assign the Web3Modal class to the reference object by setting it's `current` value
+  //     // The `current` value is persisted throughout as long as this page is open
+  //     connectWallet();
+  //   } else {
+  //     // if wallet is connected, get the game state
+  //     updateGameState();
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [walletConnected]);
 
   // When the page loads!
   useEffect(() => {
-    // on page load, kick off a websocket for listening to contract events
+    // set up wallet listeners
+    if (web3Modal.cachedProvider) {
+      connectWallet();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (provider) updateGameState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider]);
+
   const renderConnectButton = () => {
-    if (walletConnected) {
+    if (provider) {
       return null;
     } else {
       return (
@@ -391,35 +362,29 @@ export default function Home() {
     }
   };
 
-  const renderApproveButton = () => {
-    if (walletConnected) {
-      return (
-        <>
-          <Button
-            color="gradient"
-            size="lg"
-            css={{ maxWidth: "200px", margin: "0 auto" }}
-            onPress={() => setApproveModalVisible(true)}
-            disabled={approveButtonLoading}
-          >
-            {approveButtonLoading ? (
-              <Loading type="points-opacity" color="currentColor" size="lg" />
-            ) : (
-              "Pre-approve payments"
-            )}
-          </Button>
-          <Spacer y={1} />
-          {ConfirmApproveModal(
-            approveModalVisible,
-            setApproveModalVisible,
-            preApprovePayments
-          )}
-        </>
-      );
-    }
-
-    return null;
-  };
+  const renderApproveButton = () => (
+    <>
+      <Button
+        color="gradient"
+        size="lg"
+        css={{ maxWidth: "200px", margin: "0 auto" }}
+        onPress={() => setApproveModalVisible(true)}
+        disabled={approveButtonLoading}
+      >
+        {approveButtonLoading ? (
+          <Loading type="points-opacity" color="currentColor" size="lg" />
+        ) : (
+          "Pre-approve payments"
+        )}
+      </Button>
+      <Spacer y={1} />
+      {ConfirmApproveModal(
+        approveModalVisible,
+        setApproveModalVisible,
+        preApprovePayments
+      )}
+    </>
+  );
 
   const renderApproveBanner = () => (
     <Card variant="bordered">
@@ -487,7 +452,7 @@ export default function Home() {
       <Spacer y={2} />
 
       {/* If wallet isn't connected, show the button. Otherwise show the game */}
-      {!walletConnected ? (
+      {!provider ? (
         renderConnectButton()
       ) : (
         <>
