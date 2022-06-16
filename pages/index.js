@@ -59,6 +59,9 @@ export default function Home() {
   // keep track of whether the user has given payment approval or not
   const [paymentApproved, setPaymentApproved] = useState(false);
 
+  // keep track of the current player's account
+  const [account, setAccount] = useState(null);
+
   // updated prices of the tokens
   const [hiPrice, setHiPrice] = useState(0);
   const [loPrice, setLoPrice] = useState(0);
@@ -98,20 +101,14 @@ export default function Home() {
   const connectWallet = async () => {
     await web3Modal
       .connect()
-      .then((instance) => {
+      .then(async (instance) => {
         const web3Provider = new providers.Web3Provider(instance);
+        const accounts = await web3Provider.listAccounts();
+
         setProvider(web3Provider);
-        return web3Provider;
+        setAccount(accounts[0]);
       })
-      .then(async (web3Provider) => {
-        // If user is not connected to the Polygon/Mumbai network, let them know and throw an error
-        const { chainId } = await web3Provider.getNetwork();
-        if (chainId !== CHAIN_ID) {
-          window.alert("Change the network to Polygon");
-          throw new Error("Change network to Polygon");
-        }
-      })
-      .catch((err) => console.log(err));
+      .catch((err) => setErrorAndClearLoading(err));
   };
 
   // Get the token prices (done at page load + any update events)
@@ -127,9 +124,7 @@ export default function Home() {
           setLoPrice(price.toNumber());
         }
       })
-      .catch((err) => {
-        console.log(err);
-      });
+      .catch((err) => setErrorAndClearLoading(err));
   };
 
   // Get the player's token balance (done at page load + buy/sell actions)
@@ -152,7 +147,7 @@ export default function Home() {
           setHasLo(balance.toNumber() > 0);
         }
       })
-      .catch((err) => console.log(err));
+      .catch((err) => setErrorAndClearLoading(err));
   };
 
   // Check if the user has given payment approval
@@ -291,6 +286,7 @@ export default function Home() {
   };
 
   const setErrorAndClearLoading = (error) => {
+    console.log(error);
     // We unset everything loading just because it's easy
     // and we know we want nothing loading
     setError(GetErrorMsg(error));
@@ -314,22 +310,8 @@ export default function Home() {
     getBalance(LO_TOKEN_ID);
 
     // check if we're approved to make payments
-    checkApproval();
+    checkApproval().catch((err) => setErrorAndClearLoading(err));
   };
-
-  // When we connect!
-  // useEffect(() => {
-  //   // if wallet is not connected, create a new instance of Web3Modal
-  //   if (!walletConnected) {
-  //     // Assign the Web3Modal class to the reference object by setting it's `current` value
-  //     // The `current` value is persisted throughout as long as this page is open
-  //     connectWallet();
-  //   } else {
-  //     // if wallet is connected, get the game state
-  //     updateGameState();
-  //   }
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [walletConnected]);
 
   // When the page loads!
   useEffect(() => {
@@ -340,8 +322,50 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Setup game info, setup listeners for wallet changes
   useEffect(() => {
-    if (provider) updateGameState();
+    if (!provider) return;
+
+    updateGameState();
+
+    const handleAccountsChanged = (accounts) => {
+      console.log("accountsChanged", accounts);
+      if (accounts) {
+        setAccount(accounts[0]);
+        // Update game state since it differs for them
+        updateGameState();
+      }
+    };
+
+    const handleChainChanged = (chainId) => {
+      if (chainId !== CHAIN_ID) {
+        window.alert(
+          "Sorry, this doesn't work on that chain. Please change to the Polygon network!"
+        );
+        throw new Error("Change network to Polygon");
+      }
+    };
+
+    const handleDisconnect = () => {
+      console.log("disconnect", error);
+      async function disconnect() {
+        await web3Modal.clearCachedProvider();
+      }
+      disconnect();
+    };
+
+    provider.on("accountsChanged", handleAccountsChanged);
+    provider.on("chainChanged", handleChainChanged);
+    provider.on("disconnect", handleDisconnect);
+
+    return () => {
+      if (provider.removeListener) {
+        provider.removeListener("accountsChanged", handleAccountsChanged);
+        provider.removeListener("chainChanged", handleChainChanged);
+        provider.removeListener("disconnect", handleDisconnect);
+      }
+    };
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider]);
 
