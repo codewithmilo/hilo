@@ -238,7 +238,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         );
 
         // check the lock is open
-        bool isLocked = buyCounts[tokenId] == 1;
+        bool isLocked = tokenId == HI ? hiLock : loLock;
         require(!isLocked, "HILO: cannot sell when the sale is locked");
         // TODO if it isn't, add us to the queue
 
