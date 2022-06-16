@@ -7,10 +7,20 @@ import { providers, Contract, utils } from "ethers";
 
 import abi from "../src/HILOToken.json";
 
-import { Container, Text, Spacer, Grid, Button } from "@nextui-org/react";
+import {
+  Container,
+  Text,
+  Spacer,
+  Grid,
+  Button,
+  Loading,
+  Card,
+} from "@nextui-org/react";
 import { TokenCard } from "../components/TokenCard";
 import { HowToPlayModal } from "../components/HowToPlayModal";
 import { ConfirmApproveModal } from "../components/ConfirmApproveModal";
+
+import GetErrorMsg from "../components/errors";
 
 const POLYGON_CHAIN_ID = 137;
 const MUMBAI_CHAIN_ID = 80001;
@@ -50,6 +60,16 @@ export default function Home() {
   // detail modals, how to play and pre-approval description
   const [howToVisible, setHowToVisible] = useState(false);
   const [approveModalVisible, setApproveModalVisible] = useState(false);
+
+  // loading buttons
+  const [hiBuyLoading, setHiBuyLoading] = useState(false);
+  const [loBuyLoading, setLoBuyLoading] = useState(false);
+  const [hiSellLoading, setHiSellLoading] = useState(false);
+  const [loSellLoading, setLoSellLoading] = useState(false);
+  const [approveButtonLoading, setApproveButtonLoading] = useState(false);
+
+  // error
+  const [error, setError] = useState(null);
 
   // Create a reference to the Web3 Modal (used for connecting to Metamask) which persists as long as the page is open
   const web3ModalRef = useRef();
@@ -142,110 +162,141 @@ export default function Home() {
     }
   };
 
-  // Check if the user has given payment approval (done at page load)
-  const checkApproval = async () => {
-    try {
-      if (walletConnected) {
-        const signer = await getProviderOrSigner(true);
-        const address = await signer.getAddress();
-        const usdcABI = [
-          "function allowance(address owner, address spender) external view returns (uint256)",
-        ];
-        const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
+  // Check if the user has given payment approval
+  const checkApproval = async (amount = MAX_APPROVAL_AMOUNT) => {
+    const signer = await getProviderOrSigner(true);
+    const address = await signer.getAddress();
+    const usdcABI = [
+      "function allowance(address owner, address spender) external view returns (uint256)",
+    ];
+    const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
 
-        const allowance = await USDCContract.allowance(
-          address,
-          contractAddress
-        );
-        console.log("Allowance is:", utils.formatEther(allowance));
-        if (allowance > 0) setPaymentApproved(true);
-      } else {
-        console.log("Couldn't get allowance");
-      }
-    } catch (error) {
-      console.log(error);
-    }
+    return USDCContract.allowance(address, contractAddress)
+      .then((_allowance) => {
+        const allowance = parseInt(utils.formatEther(_allowance));
+        console.log("Allowance is:", allowance);
+
+        if (allowance > amount) {
+          setPaymentApproved(true);
+          return true;
+        } else {
+          return false;
+        }
+      })
+      .catch((err) => console.log(err));
+  };
+
+  // Pre-approve the contract to spend the user's USDC
+  // Set at the highest possible amount in the game
+  const preApprovePayments = async () => {
+    setApproveButtonLoading(true);
+    setApproveModalVisible(false);
+
+    return approvePayments(MAX_APPROVAL_AMOUNT);
   };
 
   // Approve payments for USDC (when button is clicked)
   // default to the max possible in the game if not specified
-  const approvePayments = async (e, _amount = MAX_APPROVAL_AMOUNT) => {
-    try {
-      if (walletConnected && !paymentApproved) {
-        const signer = await getProviderOrSigner(true);
-        const usdcABI = [
-          "function approve(address _spender, uint256 _value) public returns (bool success)",
-        ];
-        console.log(_amount, _amount.toString());
-        const amount = utils.parseUnits(_amount.toString(), 18);
+  // returns the txn receipt
+  const approvePayments = async (_amount) => {
+    const provider = await getProviderOrSigner();
+    const signer = await getProviderOrSigner(true);
+    const usdcABI = [
+      "function approve(address _spender, uint256 _value) public returns (bool success)",
+    ];
 
-        const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
+    const amount = utils.parseUnits(_amount.toString(), 18);
 
-        const approved = await USDCContract.approve(contractAddress, amount);
-        console.log("Got approval?", approved);
-        if (approved) setPaymentApproved(true);
-      } else {
-        console.log("Didn't approve!");
-      }
-    } catch (error) {
-      console.log(error);
-    }
+    const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
+
+    await USDCContract.approve(contractAddress, amount)
+      .then((txn) => provider.waitForTransaction(txn.hash))
+      .then((receipt) => {
+        console.log("Approved! Receipt:", receipt);
+        setPaymentApproved(true);
+      })
+      .catch((err) => setErrorAndClearLoading(err));
   };
 
+  // returns nothing or the txn receipt
   const checkApprovalAndPossiblyApprove = async (tokenId) => {
-    try {
-      // this will set paymentApproved
-      checkApproval();
+    // add one if it's LO, in case the price updates while purchasing
+    const amount = tokenId === LO_TOKEN_ID ? loPrice + 1 : hiPrice;
+    const approved = await checkApproval(amount);
+    console.log("checkapproval", approved);
 
-      if (paymentApproved) return; // we are good to go, nothing to do
+    // nothing to do if already approved
+    if (approved) return Promise.resolve();
 
-      // we need to ask the user to approve the payment
-      // add one if it's LO, in case the price updates while purchasing
-      const amount = tokenId === LO_TOKEN_ID ? loPrice + 1 : hiPrice;
-      approvePayments(null, amount);
-    } catch (error) {
-      console.log(error);
-    }
+    console.log("Approving payments...");
+
+    // otherwise we need to ask the user to approve the payment
+    await approvePayments(amount);
   };
 
   // Buy a token
   const buyHandler = async (tokenId) => {
-    await checkApprovalAndPossiblyApprove(tokenId);
-    try {
-      if (walletConnected) {
-        const signer = await getProviderOrSigner(true);
-        const HILOContract = new Contract(contractAddress, contractABI, signer);
+    tokenId == HI_TOKEN_ID ? setHiBuyLoading(true) : setLoBuyLoading(true);
+    const provider = await getProviderOrSigner();
 
-        const buyTxn = await HILOContract.buy(tokenId);
-        console.log("Bought tokenID %s", tokenId);
-        console.log(buyTxn);
-      } else {
-        console.log("Wallet not connected!");
-      }
-    } catch (error) {
-      console.log(error);
+    if (walletConnected) {
+      checkApprovalAndPossiblyApprove(tokenId)
+        .then(async () => {
+          const signer = await getProviderOrSigner(true);
+          const HILOContract = new Contract(
+            contractAddress,
+            contractABI,
+            signer
+          );
+          await HILOContract.buy(tokenId);
+        })
+        .then((txn) => provider.waitForTransaction(txn.hash))
+        .then((receipt) => {
+          console.log("Bought tokenID %s", tokenId);
+          console.log(receipt);
+          tokenId == HI_TOKEN_ID
+            ? setHiBuyLoading(false)
+            : setLoBuyLoading(false);
+        })
+        .catch((err) => setErrorAndClearLoading(err));
+    } else {
+      console.log("Wallet not connected!");
     }
   };
 
   // Sell a token
   const sellHandler = async (tokenId) => {
-    await checkApprovalAndPossiblyApprove();
-    try {
-      if (walletConnected) {
-        const signer = await getProviderOrSigner(true);
-        const HILOContract = new Contract(contractAddress, contractABI, signer);
+    tokenId == HI_TOKEN_ID ? setHiSellLoading(true) : setLoSellLoading(true);
+    const provider = getProviderOrSigner();
 
-        const sellTxn = await HILOContract.sell(tokenId);
-        console.log("Sold tokenID %s", tokenId);
-        console.log(sellTxn);
-      } else {
-        console.log("Wallet not connected!");
-      }
-    } catch (error) {
-      console.log(error);
+    if (walletConnected) {
+      const signer = await getProviderOrSigner(true);
+      const HILOContract = new Contract(contractAddress, contractABI, signer);
+
+      await HILOContract.sell(tokenId)
+        .then((txn) => provider.waitForTransaction(txn.hash))
+        .then((receipt) => {
+          console.log("Sold tokenID %s", tokenId);
+          console.log(receipt);
+        })
+        .catch((err) => setErrorAndClearLoading(err));
+    } else {
+      console.log("Wallet not connected!");
     }
   };
 
+  const setErrorAndClearLoading = (error) => {
+    // We unset everything loading just because it's easy
+    // and we know we want nothing loading
+    setError(GetErrorMsg(error));
+    setHiSellLoading(false);
+    setLoSellLoading(false);
+    setHiBuyLoading(false);
+    setLoBuyLoading(false);
+    setApproveButtonLoading(false);
+  };
+
+  // When we connect!
   useEffect(() => {
     // if wallet is not connected, create a new instance of Web3Modal
     if (!walletConnected) {
@@ -255,6 +306,7 @@ export default function Home() {
         network: CHAIN_NAME,
         providerOptions: {},
         disableInjectedProvider: false,
+        theme: "dark",
       });
     } else {
       // if wallet is connected, get the price of the tokens
@@ -271,9 +323,10 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletConnected]);
 
-  // useEffect(() => {
-  //   // on page load, try to connect wallet TODO
-  // }, []);
+  // When the page loads!
+  useEffect(() => {
+    // on page load, kick off a websocket for listening to contract events
+  }, []);
 
   const renderConnectButton = () => {
     if (walletConnected) {
@@ -302,14 +355,19 @@ export default function Home() {
               size="lg"
               css={{ maxWidth: "200px", margin: "0 auto" }}
               onPress={() => setApproveModalVisible(true)}
+              disabled={approveButtonLoading}
             >
-              Pre-approve payments
+              {approveButtonLoading ? (
+                <Loading type="points-opacity" color="currentColor" size="lg" />
+              ) : (
+                "Pre-approve payments"
+              )}
             </Button>
             <Spacer y={1} />
             {ConfirmApproveModal(
               approveModalVisible,
               setApproveModalVisible,
-              approvePayments
+              preApprovePayments
             )}
           </>
         );
@@ -348,8 +406,10 @@ export default function Home() {
                 hiPrice,
                 buyHandler,
                 sellHandler,
-                hasHi || hasLo,
-                !hasHi
+                hasHi || hasLo || approveButtonLoading,
+                !hasHi || approveButtonLoading,
+                hiBuyLoading,
+                hiSellLoading
               )}
             </Grid>
             <Grid xs={10} sm={6} md={4}>
@@ -359,10 +419,34 @@ export default function Home() {
                 loPrice,
                 buyHandler,
                 sellHandler,
-                hasLo || hasHi,
-                !hasLo
+                hasLo || hasHi || approveButtonLoading,
+                !hasLo || approveButtonLoading,
+                loBuyLoading,
+                loSellLoading
               )}
             </Grid>
+            {error !== null && (
+              <Grid xs={10} sm={12} md={8}>
+                <Card
+                  isPressable
+                  variant="flat"
+                  css={{
+                    backgroundColor: "#910838",
+                    padding: "10px",
+                  }}
+                  onClick={() => setError(null)}
+                >
+                  <Text
+                    b
+                    color="white"
+                    size="1.3rem"
+                    css={{ textAlign: "center" }}
+                  >
+                    {error}
+                  </Text>
+                </Card>
+              </Grid>
+            )}
           </Grid.Container>
         </>
       )}

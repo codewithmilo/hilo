@@ -1,4 +1,4 @@
-import { Card, Button, Text } from "@nextui-org/react";
+import { Card, Button, Text, Loading } from "@nextui-org/react";
 
 export const TokenCard = (
   tokenType,
@@ -7,7 +7,9 @@ export const TokenCard = (
   buy,
   sell,
   shouldDisableBuy,
-  shouldDisableSell
+  shouldDisableSell,
+  buyIsLoading,
+  sellIsLoading
 ) => (
   <Card variant="bordered">
     <Card.Body css={{ textAlign: "center !important" }}>
@@ -18,10 +20,18 @@ export const TokenCard = (
     <Card.Footer css={{ justifyContent: "center" }}>
       <Button.Group color="gradient" size="md" ghost>
         <Button onPress={() => buy(tokenId)} disabled={shouldDisableBuy}>
-          <Text h3>Buy</Text>
+          {buyIsLoading ? (
+            <Loading type="points-opacity" size="xl" />
+          ) : (
+            <Text h3>Buy</Text>
+          )}
         </Button>
         <Button onPress={() => sell(tokenId)} disabled={shouldDisableSell}>
-          <Text h3>Sell</Text>
+          {sellIsLoading ? (
+            <Loading type="points-opacity" size="xl" />
+          ) : (
+            <Text h3>Sell</Text>
+          )}
         </Button>
       </Button.Group>
     </Card.Footer>
