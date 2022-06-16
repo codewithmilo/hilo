@@ -61,7 +61,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
         uint256 _initialHi,
         uint256 _initialLo,
         uint256 _buyRequiredCount
-    ) ERC1155("") {
+    ) ERC1155("https://hilo-eight.vercel.app/api/tokens/{id}") {
         // set the start prices
         initialHi = hiPrice = _initialHi;
         initialLo = loPrice = _initialLo;

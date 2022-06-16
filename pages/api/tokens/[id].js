@@ -1,10 +1,11 @@
 // /api/tokens/{id}
 export default function handler(req, res) {
   const { id } = req.query;
-  console.log(id, req);
+  const tid = parseInt(id);
   let metadata;
-  switch (id) {
-    case "0":
+
+  switch (tid) {
+    case 0:
       metadata = {
         name: "HI",
         description: "The Hi token",
@@ -12,7 +13,7 @@ export default function handler(req, res) {
           "ipfs://bafkreihguk3zwpsyw44hkbdbkug2bxqr5wnajvb45gquhsee6tasax2fk4",
       };
       break;
-    case "1":
+    case 1:
       metadata = {
         name: "LO",
         description: "The Lo token",
