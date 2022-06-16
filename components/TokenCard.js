@@ -19,14 +19,20 @@ export const TokenCard = (
     <Card.Divider />
     <Card.Footer css={{ justifyContent: "center" }}>
       <Button.Group color="gradient" size="md" ghost>
-        <Button onPress={() => buy(tokenId)} disabled={shouldDisableBuy}>
+        <Button
+          onPress={() => buy(tokenId)}
+          disabled={shouldDisableBuy || buyIsLoading}
+        >
           {buyIsLoading ? (
             <Loading type="points-opacity" size="xl" />
           ) : (
             <Text h3>Buy</Text>
           )}
         </Button>
-        <Button onPress={() => sell(tokenId)} disabled={shouldDisableSell}>
+        <Button
+          onPress={() => sell(tokenId)}
+          disabled={shouldDisableSell || sellIsLoading}
+        >
           {sellIsLoading ? (
             <Loading type="points-opacity" size="xl" />
           ) : (

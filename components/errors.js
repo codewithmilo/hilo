@@ -7,7 +7,7 @@ const errorMap = {
 };
 
 export default function GetErrorMsg(error) {
-  let errorMessage;
+  let errorMessage = null;
 
   // We have a metamask error: catch it
   if (typeof error.code === "number") {
