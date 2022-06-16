@@ -539,13 +539,12 @@ export default function Home() {
         HiLo
       </Text>
 
-      <Text size="3rem" className={styles.subtitle}>
-        A Game of Tokens
-      </Text>
-
       {/* If wallet isn't connected, show the button. Otherwise show the game */}
       {!gameReady ? (
         <>
+          <Text size="3rem" className={styles.subtitle}>
+            A Game of Tokens
+          </Text>
           <Spacer y={10} />
           {renderConnectButton()}
           {walletError && (
