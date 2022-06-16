@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 
@@ -54,13 +54,14 @@ if (typeof window !== "undefined") {
 
 export default function Home() {
   // the wallet provider
+  const [wallet, setWallet] = useState(null);
   const [provider, setProvider] = useState(null);
+  const [account, setAccount] = useState(null);
+  const [chainId, setChainId] = useState(null);
+  const [gameReady, setGameReady] = useState(false);
 
   // keep track of whether the user has given payment approval or not
   const [paymentApproved, setPaymentApproved] = useState(false);
-
-  // keep track of the current player's account
-  const [account, setAccount] = useState(null);
 
   // updated prices of the tokens
   const [hiPrice, setHiPrice] = useState(0);
@@ -91,8 +92,9 @@ export default function Home() {
   const [sellSuccess, setSellSuccess] = useState(false);
   const [pendingTokenSell, setPendingTokenSell] = useState(null); // this becomes 0 or 1
 
-  // error
+  // errors
   const [error, setError] = useState(null);
+  const [walletError, setWalletError] = useState(null);
 
   // The HILO contract
   const contractAddress = HILO_CONTRACT_ADDRESS;
@@ -102,13 +104,25 @@ export default function Home() {
     await web3Modal
       .connect()
       .then(async (instance) => {
-        const web3Provider = new providers.Web3Provider(instance);
-        const accounts = await web3Provider.listAccounts();
+        const library = new providers.Web3Provider(instance);
+        const accounts = await library.listAccounts();
+        const network = await library.getNetwork();
 
-        setProvider(web3Provider);
-        setAccount(accounts[0]);
+        setWallet(instance);
+        if (accounts) setAccount(accounts[0]);
+
+        // // make sure we're on polygon
+        if (network.chainId !== CHAIN_ID) {
+          web3Modal.clearCachedProvider();
+          throw new Error("bad_chain");
+        }
+
+        // otherwise it ok
+        setProvider(library);
+        setChainId(network.chainId);
+        setGameReady(true);
       })
-      .catch((err) => setErrorAndClearLoading(err));
+      .catch((err) => showWalletError(err));
   };
 
   // Get the token prices (done at page load + any update events)
@@ -302,21 +316,23 @@ export default function Home() {
 
   const updateGameState = () => {
     // get the price of the tokens
-    getPrice(HI_TOKEN_ID);
-    getPrice(LO_TOKEN_ID);
+    getPrice(HI_TOKEN_ID).catch((err) => setErrorAndClearLoading(err));
+    getPrice(LO_TOKEN_ID).catch((err) => setErrorAndClearLoading(err));
 
     // then check if the user has any tokens
-    getBalance(HI_TOKEN_ID);
-    getBalance(LO_TOKEN_ID);
+    getBalance(HI_TOKEN_ID).catch((err) => setErrorAndClearLoading(err));
+    getBalance(LO_TOKEN_ID).catch((err) => setErrorAndClearLoading(err));
 
     // check if we're approved to make payments
     checkApproval().catch((err) => setErrorAndClearLoading(err));
+
+    console.log(chainId, account);
   };
 
   // When the page loads!
   useEffect(() => {
-    // set up wallet listeners
     if (web3Modal.cachedProvider) {
+      // web3Modal.clearCachedProvider();
       connectWallet();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -324,60 +340,93 @@ export default function Home() {
 
   // Setup game info, setup listeners for wallet changes
   useEffect(() => {
-    if (!provider) return;
+    if (!wallet) return;
 
-    updateGameState();
+    if (wallet && provider) updateGameState();
 
     const handleAccountsChanged = (accounts) => {
       console.log("accountsChanged", accounts);
-      if (accounts) {
+      if (accounts.length) {
         setAccount(accounts[0]);
         // Update game state since it differs for them
         updateGameState();
+      } else {
+        (async function () {
+          await web3Modal.clearCachedProvider();
+        })();
+        window.location.reload();
       }
     };
 
     const handleChainChanged = (chainId) => {
-      if (chainId !== CHAIN_ID) {
-        window.alert(
-          "Sorry, this doesn't work on that chain. Please change to the Polygon network!"
-        );
-        throw new Error("Change network to Polygon");
-      }
+      console.log("chainChanged", chainId);
+      // ethers said to just do this. fair!
+      window.location.reload();
     };
 
-    const handleDisconnect = () => {
-      console.log("disconnect", error);
-      async function disconnect() {
-        await web3Modal.clearCachedProvider();
-      }
-      disconnect();
-    };
-
-    provider.on("accountsChanged", handleAccountsChanged);
-    provider.on("chainChanged", handleChainChanged);
-    provider.on("disconnect", handleDisconnect);
+    wallet.on("accountsChanged", handleAccountsChanged);
+    wallet.on("chainChanged", handleChainChanged);
 
     return () => {
-      if (provider.removeListener) {
-        provider.removeListener("accountsChanged", handleAccountsChanged);
-        provider.removeListener("chainChanged", handleChainChanged);
-        provider.removeListener("disconnect", handleDisconnect);
+      if (wallet.removeListener) {
+        wallet.removeListener("accountsChanged", handleAccountsChanged);
+        wallet.removeListener("chainChanged", handleChainChanged);
       }
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider]);
+  }, [wallet]);
+
+  const showWalletError = (error) => {
+    console.log(error, error.message);
+    let errDisplay;
+    switch (error.message) {
+      case "bad_chain":
+        errDisplay = "Please switch to the Polygon network to play.";
+        break;
+      case "User Rejected":
+        errDisplay = "Request to connect rejected. Please try again.";
+        break;
+      default:
+        errDisplay = "Something went wrong. Please try again.";
+        break;
+    }
+    setWalletError(errDisplay);
+  };
+
+  const renderPlayer = () => {
+    const truncateAddress = (address) => {
+      if (!address) return "No Account";
+      const match = address.match(
+        /^(0x[a-zA-Z0-9]{4})[a-zA-Z0-9]+([a-zA-Z0-9]{4})$/
+      );
+      if (!match) return address;
+      return `${match[1]}…${match[2]}`;
+    };
+    return (
+      <Card
+        variant="bordered"
+        css={{ maxWidth: "300px", margin: "0 auto", padding: "10px" }}
+      >
+        <Text h4 css={{ textAlign: "center" }}>
+          Player {truncateAddress(account)} connected
+        </Text>
+      </Card>
+    );
+  };
 
   const renderConnectButton = () => {
-    if (provider) {
+    if (wallet) {
       return null;
     } else {
       return (
         <Button
           color="gradient"
-          size="lg"
-          css={{ maxWidth: "200px", margin: "0 auto" }}
+          size="xl"
+          css={{
+            maxWidth: "200px",
+            margin: "0 auto",
+          }}
           onPress={connectWallet}
         >
           Connect wallet to play
@@ -447,6 +496,27 @@ export default function Home() {
     );
   };
 
+  const renderSellBanner = () => {
+    const token =
+      pendingTokenSell === HI_TOKEN_ID ? HI_TOKEN_NAME : LO_TOKEN_NAME;
+    const price = pendingTokenSell === HI_TOKEN_ID ? hiPrice : loPrice;
+    return (
+      <Card variant="bordered">
+        <Card.Body>
+          {sellSuccess ? (
+            <Text b color="white" size="lg" css={{ textAlign: "center" }}>
+              You just bought a {token} token!
+            </Text>
+          ) : (
+            <Loading type="points-opacity" color="secondary" size="lg">
+              Buying a {token} token for ${price}...
+            </Loading>
+          )}
+        </Card.Body>
+      </Card>
+    );
+  };
+
   const renderErrorBanner = () => (
     <Card
       isPressable
@@ -473,13 +543,40 @@ export default function Home() {
         A Game of Tokens
       </Text>
 
-      <Spacer y={2} />
-
       {/* If wallet isn't connected, show the button. Otherwise show the game */}
-      {!provider ? (
-        renderConnectButton()
+      {!gameReady ? (
+        <>
+          <Spacer y={10} />
+          {renderConnectButton()}
+          {walletError && (
+            <>
+              <Spacer y={2} />
+              <Card
+                isPressable={!wallet}
+                variant="bordered"
+                css={{ margin: "0 auto", maxWidth: "600px" }}
+                onPress={() => setWalletError(null)}
+              >
+                <Card.Body>
+                  <Text
+                    b
+                    color="error"
+                    size="1.3rem"
+                    css={{ textAlign: "center" }}
+                  >
+                    {walletError}
+                  </Text>
+                </Card.Body>
+              </Card>
+            </>
+          )}
+        </>
       ) : (
         <>
+          {/* Show the player */}
+          {account !== null && renderPlayer()}
+          <Spacer y={2} />
+
           {/* If payment is not approved, show the button */}
           {!paymentApproved && renderApproveButton()}
 
@@ -515,28 +612,19 @@ export default function Home() {
             pendingApproveAmount > 0 ||
             approvalSuccess ||
             pendingTokenBuy !== null ||
-            buySuccess ? (
+            buySuccess ||
+            sellSuccess ? (
               <Grid xs={10} sm={12} md={8}>
                 {error !== null && renderErrorBanner()}
                 {(pendingApproveAmount > 0 || approvalSuccess) &&
                   renderApproveBanner()}
                 {pendingTokenBuy !== null && renderBuyBanner()}
+                {pendingTokenSell !== null && renderSellBanner()}
               </Grid>
             ) : null}
           </Grid.Container>
         </>
       )}
-
-      <Spacer y={4} />
-
-      <Text
-        size="1.8rem"
-        className={styles.howTo}
-        onClick={() => setHowToVisible(true)}
-      >
-        How to play
-      </Text>
-      {HowToPlayModal(howToVisible, setHowToVisible)}
 
       <Spacer y={6} />
 
@@ -548,6 +636,10 @@ export default function Home() {
         >
           A MOLO production
         </a>
+        <Text className={styles.howTo} onClick={() => setHowToVisible(true)}>
+          How to play
+        </Text>
+        {HowToPlayModal(howToVisible, setHowToVisible)}
       </footer>
     </Container>
   );

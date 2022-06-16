@@ -1,10 +1,13 @@
 .title,
-.subtitle,
-.howTo {
+.subtitle {
   text-align: center;
 }
 
-.howTo:hover {
+.walletLinks {
+  text-align: center;
+  text-decoration: underline;
+}
+.walletLinks:hover {
   cursor: pointer;
 }
 
