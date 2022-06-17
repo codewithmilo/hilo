@@ -346,16 +346,13 @@ export default function Home() {
 
     const handleAccountsChanged = (accounts) => {
       console.log("accountsChanged", accounts);
-      if (accounts.length) {
-        setAccount(accounts[0]);
-        // Update game state since it differs for them
-        updateGameState();
-      } else {
+      if (!accounts.length) {
+        // this is effectively a disconnect
         (async function () {
           await web3Modal.clearCachedProvider();
         })();
-        window.location.reload();
       }
+      window.location.reload();
     };
 
     const handleChainChanged = (chainId) => {
