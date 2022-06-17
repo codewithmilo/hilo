@@ -6,6 +6,8 @@ const errorMap = {
     "It looks like we are short some USDC. Top up and try again?",
   "execution reverted: HILO: cannot sell when the sale is locked":
     "Selling at this price is locked. Try again later.",
+  "execution reverted: Insufficient USDC balance.":
+    "It appears you don't have enough USDC. Get some and come back!",
 };
 
 export default function GetErrorMsg(error) {

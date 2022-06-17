@@ -15,6 +15,7 @@ import {
   Button,
   Loading,
   Card,
+  Image,
 } from "@nextui-org/react";
 import { TokenCard } from "../components/TokenCard";
 import { HowToPlayModal } from "../components/HowToPlayModal";
@@ -35,10 +36,13 @@ const LO_TOKEN_ID = 1;
 const HI_TOKEN_NAME = "Hi";
 const LO_TOKEN_NAME = "Lo";
 
-// The highest possible price in the game, for pre-approval
-const MAX_APPROVAL_AMOUNT = 1000;
+// Enough to never pay approval fees again, for pre-approval
+// Follow the sum of integers formula: n * (h + l) / 2
+const INITIAL_HI = 5;
+const INITIAL_LO = 1;
+const MAX_APPROVAL_AMOUNT = (INITIAL_HI * (INITIAL_HI + INITIAL_LO)) / 2;
 
-const HILO_CONTRACT_ADDRESS = "0xdFe7BB50ea729aBA877e4AcdF0548175240CB82D";
+const HILO_CONTRACT_ADDRESS = "0xa1220cCe6D01a84dC208cA2bd1523f1e3E080E62";
 
 const USDC_ADDRESS = "0xe11A86849d99F524cAC3E7A0Ec1241828e332C62";
 
@@ -197,12 +201,26 @@ export default function Home() {
     setApproveButtonLoading(true);
     setApproveModalVisible(false);
 
-    await approvePayments(MAX_APPROVAL_AMOUNT).then((receipt) => {
-      console.log(receipt);
-      setPaymentApproved(true);
-      setApprovalSuccess(true);
-      setPendingApproveAmount(0);
-    });
+    await approvePayments(MAX_APPROVAL_AMOUNT)
+      .then(() => {
+        setApproveButtonLoading(false);
+        setPaymentApproved(true);
+        setApprovalSuccess(true);
+      })
+      .catch((err) => setErrorAndClearLoading(err));
+  };
+
+  // returns nothing or the txn receipt
+  const checkApprovalAndPossiblyApprove = async (tokenId) => {
+    // add one if it's LO, in case the price updates while purchasing
+    const amount = tokenId === LO_TOKEN_ID ? loPrice + 1 : hiPrice;
+    const approved = await checkApproval(amount);
+
+    // nothing to do if already approved
+    if (approved) return Promise.resolve();
+
+    // otherwise we need to ask the user to approve the payment
+    await approvePayments(amount);
   };
 
   // Approve payments for USDC (when button is clicked)
@@ -223,11 +241,11 @@ export default function Home() {
     const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
 
     return USDCContract.approve(contractAddress, amount)
+      .catch((err) => handleTxnError(err))
       .then((txn) => provider.waitForTransaction(txn.hash))
       .then((receipt) => {
         console.log("Approved!", receipt);
         setPendingApproveAmount(0);
-        if (amount === MAX_APPROVAL_AMOUNT) setPaymentApproved(true);
       })
       .catch((err) => {
         setErrorAndClearLoading(err);
@@ -236,29 +254,19 @@ export default function Home() {
       });
   };
 
-  // returns nothing or the txn receipt
-  const checkApprovalAndPossiblyApprove = async (tokenId) => {
-    // add one if it's LO, in case the price updates while purchasing
-    const amount = tokenId === LO_TOKEN_ID ? loPrice + 1 : hiPrice;
-    const approved = await checkApproval(amount);
-
-    // nothing to do if already approved
-    if (approved) return Promise.resolve();
-
-    // otherwise we need to ask the user to approve the payment
-    await approvePayments(amount);
-  };
-
   // Buy a token
   const buyHandler = async (tokenId) => {
     tokenId == HI_TOKEN_ID ? setHiBuyLoading(true) : setLoBuyLoading(true);
+    clearBanners();
+
     checkApprovalAndPossiblyApprove(tokenId)
       .then(async () => {
         setPendingTokenBuy(tokenId);
         const signer = provider.getSigner();
         const HILOContract = new Contract(contractAddress, contractABI, signer);
-        await HILOContract.buy(tokenId);
+        return HILOContract.buy(tokenId);
       })
+      .catch((err) => handleTxnError(err))
       .then((txn) => provider.waitForTransaction(txn.hash))
       .then((receipt) => {
         console.log("Bought tokenID %s", tokenId);
@@ -278,10 +286,12 @@ export default function Home() {
   // Sell a token
   const sellHandler = async (tokenId) => {
     tokenId == HI_TOKEN_ID ? setHiSellLoading(true) : setLoSellLoading(true);
+    clearBanners();
 
     setPendingTokenSell(tokenId);
     const signer = provider.getSigner();
     const HILOContract = new Contract(contractAddress, contractABI, signer);
+    console.log(signer, HILOContract);
 
     await HILOContract.sell(tokenId)
       .then((txn) => provider.waitForTransaction(txn.hash))
@@ -299,6 +309,20 @@ export default function Home() {
       .catch((err) => setErrorAndClearLoading(err));
   };
 
+  const handleTxnError = (err) => {
+    console.log(err);
+    const errCode = err.code;
+    console.log(errCode);
+    console.log(err.replacement);
+
+    // if we changed the txn, send through the new one
+    if (errCode === "TRANSACTION_REPLACED") {
+      return err.replacement;
+    } else {
+      throw err;
+    }
+  };
+
   const setErrorAndClearLoading = (error) => {
     console.log(error);
     // We unset everything loading just because it's easy
@@ -314,6 +338,13 @@ export default function Home() {
     setPendingApproveAmount(0);
   };
 
+  const clearBanners = () => {
+    setError(null);
+    setApprovalSuccess(false);
+    setBuySuccess(false);
+    setSellSuccess(false);
+  };
+
   const updateGameState = () => {
     // get the price of the tokens
     getPrice(HI_TOKEN_ID).catch((err) => setErrorAndClearLoading(err));
@@ -325,8 +356,6 @@ export default function Home() {
 
     // check if we're approved to make payments
     checkApproval().catch((err) => setErrorAndClearLoading(err));
-
-    console.log(chainId, account);
   };
 
   // When the page loads!
@@ -412,6 +441,22 @@ export default function Home() {
     );
   };
 
+  const renderHoldings = () => (
+    <Card
+      variant="bordered"
+      css={{ maxWidth: "200px", margin: "0 auto", padding: "10px" }}
+    >
+      <Text h5 css={{ textAlign: "center" }}>
+        You have one {hasHi ? "Hi" : "Lo"} token
+      </Text>
+      <Image
+        alt="Hi or Lo token"
+        height={40}
+        src={hasHi ? "/img/hiToken.png" : "/img/loToken.png"}
+      />
+    </Card>
+  );
+
   const renderConnectButton = () => {
     if (wallet) {
       return null;
@@ -457,15 +502,22 @@ export default function Home() {
   );
 
   const renderApproveBanner = () => (
-    <Card variant="bordered">
+    <Card
+      variant="bordered"
+      isPressable={approvalSuccess}
+      onPress={() => setApprovalSuccess(false)}
+    >
       <Card.Body>
         {approvalSuccess ? (
-          <Text b color="white" size="lg" css={{ textAlign: "center" }}>
+          <Text b color="white" size="1.2rem" css={{ textAlign: "center" }}>
             Successfully approved!
           </Text>
         ) : (
           <Loading type="points-opacity" color="secondary" size="lg">
-            Approving USDC transactions...
+            Approving{" "}
+            {pendingApproveAmount == MAX_APPROVAL_AMOUNT
+              ? "all USDC transactions..."
+              : "this USDC transaction..."}
           </Loading>
         )}
       </Card.Body>
@@ -502,11 +554,11 @@ export default function Home() {
         <Card.Body>
           {sellSuccess ? (
             <Text b color="white" size="lg" css={{ textAlign: "center" }}>
-              You just bought a {token} token!
+              You just sold a {token} token!
             </Text>
           ) : (
             <Loading type="points-opacity" color="secondary" size="lg">
-              Buying a {token} token for ${price}...
+              Selling a {token} token for ${price}...
             </Loading>
           )}
         </Card.Body>
@@ -571,6 +623,8 @@ export default function Home() {
         <>
           {/* Show the player */}
           {account !== null && renderPlayer()}
+          <Spacer y={1} />
+          {(hasHi || hasLo) && renderHoldings()}
           <Spacer y={2} />
 
           {/* If payment is not approved, show the button */}
@@ -608,6 +662,7 @@ export default function Home() {
             pendingApproveAmount > 0 ||
             approvalSuccess ||
             pendingTokenBuy !== null ||
+            pendingTokenSell !== null ||
             buySuccess ||
             sellSuccess ? (
               <Grid xs={10} sm={12} md={8}>
