@@ -6,13 +6,13 @@ async function main() {
   const buyCount = 2;
 
   // We get the contract to deploy
-  const HILOToken = await hre.ethers.getContractFactory("HILOToken");
-  const token = await HILOToken.deploy(hiPrice, loPrice, buyCount);
+  const HILO = await hre.ethers.getContractFactory("HILO");
+  const token = await HILO.deploy(hiPrice, loPrice, buyCount);
 
   await token.deployed();
 
   console.log("Token deployed to:", token.address);
-  console.log("Don't forget to update HILOToken.json with the new ABI!");
+  console.log("Don't forget to update HILO.json with the new ABI!");
   console.log("And then, update index.js with the new contract address!");
 
   // After this finishes, run `npx hardhat verify ~token.address~ ~hiPrice~ ~loPrice~ ~buyCount~` to verify

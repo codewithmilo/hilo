@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 
-contract HILOToken is ERC1155, Ownable, Pausable {
+contract HILO is ERC1155, Ownable, Pausable {
     uint256 public constant HI = 0;
     uint256 public constant LO = 1;
 
@@ -282,7 +282,7 @@ contract HILOToken is ERC1155, Ownable, Pausable {
                 to == address(0) ||
                 from == address(this) ||
                 to == address(this),
-            "HILOToken: non transferrable"
+            "HILO: non transferrable"
         );
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }

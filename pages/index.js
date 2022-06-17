@@ -5,7 +5,7 @@ import styles from "../styles/Home.module.css";
 import Web3Modal from "web3modal";
 import { providers, Contract, utils } from "ethers";
 
-import abi from "../src/HILOToken.json";
+import abi from "../src/HILO.json";
 
 import {
   Container,
