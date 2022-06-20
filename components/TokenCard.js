@@ -21,7 +21,7 @@ export const TokenCard = (
       <Button.Group color="gradient" size="md" ghost>
         <Button
           onPress={() => buy(tokenId)}
-          disabled={shouldDisableBuy || buyIsLoading}
+          disabled={shouldDisableBuy || buyIsLoading || sellIsLoading}
         >
           {buyIsLoading ? (
             <Loading type="points-opacity" size="xl" />
@@ -31,7 +31,7 @@ export const TokenCard = (
         </Button>
         <Button
           onPress={() => sell(tokenId)}
-          disabled={shouldDisableSell || sellIsLoading}
+          disabled={shouldDisableSell || sellIsLoading || buyIsLoading}
         >
           {sellIsLoading ? (
             <Loading type="points-opacity" size="xl" />

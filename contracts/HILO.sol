@@ -98,13 +98,13 @@ contract HILO is ERC1155, Ownable, Pausable {
 
     function decreaseHiPrice() private {
         hiPrice = hiPrice - 1;
-        assert(hiPrice > 0);
+        assert(hiPrice >= 0);
         emit hiDecreased(hiPrice);
     }
 
     function increaseLoPrice() private {
         loPrice = loPrice + 1;
-        assert(loPrice < hiPrice);
+        assert(loPrice <= hiPrice);
         emit loIncreased(loPrice);
     }
 
@@ -134,12 +134,6 @@ contract HILO is ERC1155, Ownable, Pausable {
 
         // game over
         _pause();
-
-        console.log("Game over! The prices converged at:", price);
-        console.log("The winners are:");
-        for (uint256 i = 0; i < winners.length; i++) {
-            console.log(winners[i]);
-        }
     }
 
     event buyPriceCheck(address player, uint256 tokenId, uint256 price);
@@ -223,6 +217,10 @@ contract HILO is ERC1155, Ownable, Pausable {
         _sell(player, tokenId);
     }
 
+    event salePayment(address player, uint256 amount);
+    event tokenBurned(address player, uint256 tokenId);
+    event loSent(address player);
+
     function _sell(address player, uint256 tokenId) private {
         // check if paused
         require(!paused(), "Game is paused.");
@@ -247,24 +245,27 @@ contract HILO is ERC1155, Ownable, Pausable {
 
         // end game if the prices converged
         if (hiPrice == loPrice) {
-            priceConverged(getPrice(tokenId));
+            return priceConverged(getPrice(tokenId));
         }
 
         // pay them
-        uint256 price = getPrice(tokenId) * 1 ether;
+        uint256 price = getPrice(tokenId);
+        price = price * 1 ether;
         usdc.transfer(player, price);
+        emit salePayment(player, price);
 
         // burn the token
         _burn(player, tokenId, 1);
+        emit tokenBurned(player, tokenId);
 
         // if the game is still going, update the price
         updatePrice(tokenId);
 
-        // send them LO if they sold HI
+        // // send them LO if they sold HI
         if (tokenId == HI && balanceOf(player, LO) == 0) {
             _mint(player, LO, 1, "");
             updateBuyCount(LO);
-            console.log("LO transferred from HI sale, recepient:", player);
+            emit loSent(player);
         }
     }
 

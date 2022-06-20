@@ -42,7 +42,7 @@ const INITIAL_HI = 5;
 const INITIAL_LO = 1;
 const MAX_APPROVAL_AMOUNT = (INITIAL_HI * (INITIAL_HI + INITIAL_LO)) / 2;
 
-const HILO_CONTRACT_ADDRESS = "0xa1220cCe6D01a84dC208cA2bd1523f1e3E080E62";
+const HILO_CONTRACT_ADDRESS = "0x3EA7357f5E51E153651e629c08B8c576dF84a001";
 
 const USDC_ADDRESS = "0xe11A86849d99F524cAC3E7A0Ec1241828e332C62";
 
@@ -169,7 +169,7 @@ export default function Home() {
   };
 
   // Check if the user has given payment approval
-  const checkApproval = async (amount = MAX_APPROVAL_AMOUNT) => {
+  const checkApproval = async (amount = INITIAL_HI) => {
     const signer = provider.getSigner();
     const address = await signer.getAddress();
     const usdcABI = [
@@ -183,7 +183,7 @@ export default function Home() {
         console.log("Allowance is:", allowance);
 
         if (allowance >= amount) {
-          if (allowance == MAX_APPROVAL_AMOUNT) setPaymentApproved(true);
+          if (allowance >= INITIAL_HI) setPaymentApproved(true);
           return true;
         } else {
           return false;
@@ -291,7 +291,6 @@ export default function Home() {
     setPendingTokenSell(tokenId);
     const signer = provider.getSigner();
     const HILOContract = new Contract(contractAddress, contractABI, signer);
-    console.log(signer, HILOContract);
 
     await HILOContract.sell(tokenId)
       .then((txn) => provider.waitForTransaction(txn.hash))
@@ -639,7 +638,7 @@ export default function Home() {
                 hiPrice,
                 buyHandler,
                 sellHandler,
-                hasHi || hasLo || approveButtonLoading,
+                hasHi || hasLo || approveButtonLoading || loBuyLoading,
                 !hasHi || approveButtonLoading,
                 hiBuyLoading,
                 hiSellLoading
@@ -652,7 +651,7 @@ export default function Home() {
                 loPrice,
                 buyHandler,
                 sellHandler,
-                hasLo || hasHi || approveButtonLoading,
+                hasLo || hasHi || approveButtonLoading || hiBuyLoading,
                 !hasLo || approveButtonLoading,
                 loBuyLoading,
                 loSellLoading
