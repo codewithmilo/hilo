@@ -5,51 +5,31 @@ import styles from "../styles/Home.module.css";
 import Web3Modal from "web3modal";
 import { providers, Contract, utils } from "ethers";
 
-import abi from "../src/HILO.json";
-
+import { Container, Text, Spacer, Grid, Card } from "@nextui-org/react";
+import { renderPlayer, renderHoldings } from "../components/playerInfo";
+import { HowToPlayModal } from "../components/modals";
 import {
-  Container,
-  Text,
-  Spacer,
-  Grid,
-  Button,
-  Loading,
-  Card,
-  Image,
-} from "@nextui-org/react";
-import { TokenCard } from "../components/TokenCard";
-import { HowToPlayModal } from "../components/HowToPlayModal";
-import { ConfirmApproveModal } from "../components/ConfirmApproveModal";
+  renderErrorBanner,
+  renderWalletErrorBanner,
+  renderTradeBanner,
+  renderApproveBanner,
+} from "../components/banners";
+import {
+  renderConnectButton,
+  renderApproveButton,
+  TokenCard,
+} from "../components/buttons";
 
-import GetErrorMsg from "../components/errors";
+import { GetErrorMsg, getWalletError, handleTxnError } from "../lib/errors";
+import { CONSTANTS } from "../lib/constants";
+import * as HILO from "../lib/contract";
 
-const POLYGON_CHAIN_ID = 137;
-const MUMBAI_CHAIN_ID = 80001;
-const CHAIN_ID = MUMBAI_CHAIN_ID;
-
-const MUMBAI_CHAIN = "mumbai";
-const POLYGON_CHAIN = "polygon";
-const CHAIN_NAME = MUMBAI_CHAIN;
-
-const HI_TOKEN_ID = 0;
-const LO_TOKEN_ID = 1;
-const HI_TOKEN_NAME = "Hi";
-const LO_TOKEN_NAME = "Lo";
-
-// Enough to never pay approval fees again, for pre-approval
-// Follow the sum of integers formula: n * (h + l) / 2
-const INITIAL_HI = 5;
-const INITIAL_LO = 1;
-const MAX_APPROVAL_AMOUNT = (INITIAL_HI * (INITIAL_HI + INITIAL_LO)) / 2;
-
-const HILO_CONTRACT_ADDRESS = "0x3EA7357f5E51E153651e629c08B8c576dF84a001";
-
-const USDC_ADDRESS = "0xe11A86849d99F524cAC3E7A0Ec1241828e332C62";
+import abi from "../src/HILO.json";
 
 let web3Modal;
 if (typeof window !== "undefined") {
   web3Modal = new Web3Modal({
-    network: CHAIN_NAME,
+    network: CONSTANTS.CHAIN_NAME,
     providerOptions: {},
     theme: "dark",
     cacheProvider: true,
@@ -61,8 +41,9 @@ export default function Home() {
   const [wallet, setWallet] = useState(null);
   const [provider, setProvider] = useState(null);
   const [account, setAccount] = useState(null);
-  const [chainId, setChainId] = useState(null);
   const [gameReady, setGameReady] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [winners, setWinners] = useState([]);
 
   // keep track of whether the user has given payment approval or not
   const [paymentApproved, setPaymentApproved] = useState(false);
@@ -100,10 +81,6 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [walletError, setWalletError] = useState(null);
 
-  // The HILO contract
-  const contractAddress = HILO_CONTRACT_ADDRESS;
-  const contractABI = abi.abi;
-
   const connectWallet = async () => {
     await web3Modal
       .connect()
@@ -116,83 +93,16 @@ export default function Home() {
         if (accounts) setAccount(accounts[0]);
 
         // // make sure we're on polygon
-        if (network.chainId !== CHAIN_ID) {
+        if (network.chainId !== CONSTANTS.CHAIN_ID) {
           web3Modal.clearCachedProvider();
           throw new Error("bad_chain");
         }
 
         // otherwise it ok
         setProvider(library);
-        setChainId(network.chainId);
         setGameReady(true);
       })
-      .catch((err) => showWalletError(err));
-  };
-
-  // Get the token prices (done at page load + any update events)
-  const getPrice = async (tokenId) => {
-    const HILOContract = new Contract(contractAddress, contractABI, provider);
-
-    await HILOContract.getPrice(tokenId)
-      .then((price) => {
-        console.log("Got price for tokenID %s: %s", tokenId, price.toNumber());
-        if (tokenId === HI_TOKEN_ID) {
-          setHiPrice(price.toNumber());
-        } else {
-          setLoPrice(price.toNumber());
-        }
-      })
-      .catch((err) => setErrorAndClearLoading(err));
-  };
-
-  // Get the player's token balance (done at page load + buy/sell actions)
-  const getBalance = async (tokenId) => {
-    const signer = provider.getSigner();
-    const address = await signer.getAddress();
-
-    const HILOContract = new Contract(contractAddress, contractABI, signer);
-
-    await HILOContract.balanceOf(address, tokenId)
-      .then((balance) => {
-        console.log(
-          "Got balance for tokenID %s: %s",
-          tokenId,
-          balance.toNumber()
-        );
-        if (tokenId === HI_TOKEN_ID) {
-          setHasHi(balance.toNumber() > 0);
-        } else {
-          setHasLo(balance.toNumber() > 0);
-        }
-      })
-      .catch((err) => setErrorAndClearLoading(err));
-  };
-
-  // Check if the user has given payment approval
-  const checkApproval = async (amount = INITIAL_HI) => {
-    const signer = provider.getSigner();
-    const address = await signer.getAddress();
-    const usdcABI = [
-      "function allowance(address owner, address spender) external view returns (uint256)",
-    ];
-    const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
-
-    return USDCContract.allowance(address, contractAddress)
-      .then((_allowance) => {
-        const allowance = parseInt(utils.formatEther(_allowance));
-        console.log("Allowance is:", allowance);
-
-        if (allowance >= amount) {
-          if (allowance >= INITIAL_HI) setPaymentApproved(true);
-          return true;
-        } else {
-          return false;
-        }
-      })
-      .catch((err) => {
-        setErrorAndClearLoading(err);
-        throw err;
-      });
+      .catch((err) => getWalletError(err, setWalletError));
   };
 
   // Pre-approve the contract to spend the user's USDC
@@ -201,7 +111,12 @@ export default function Home() {
     setApproveButtonLoading(true);
     setApproveModalVisible(false);
 
-    await approvePayments(MAX_APPROVAL_AMOUNT)
+    await HILO.approvePayments(
+      CONSTANTS.MAX_APPROVAL_AMOUNT,
+      provider,
+      setPendingApproveAmount,
+      setErrorAndClearLoading
+    )
       .then(() => {
         setApproveButtonLoading(false);
         setPaymentApproved(true);
@@ -213,57 +128,41 @@ export default function Home() {
   // returns nothing or the txn receipt
   const checkApprovalAndPossiblyApprove = async (tokenId) => {
     // add one if it's LO, in case the price updates while purchasing
-    const amount = tokenId === LO_TOKEN_ID ? loPrice + 1 : hiPrice;
-    const approved = await checkApproval(amount);
+    const amount = tokenId === CONSTANTS.LO_TOKEN_ID ? loPrice + 1 : hiPrice;
+    const approved = await HILO.checkApproval(
+      provider,
+      setPaymentApproved,
+      amount
+    ).catch((err) => setErrorAndClearLoading(err));
 
     // nothing to do if already approved
     if (approved) return Promise.resolve();
 
     // otherwise we need to ask the user to approve the payment
-    await approvePayments(amount);
-  };
-
-  // Approve payments for USDC (when button is clicked)
-  // default to the max possible in the game if not specified
-  // returns the txn receipt
-  const approvePayments = async (_amount) => {
-    // Show in the UI
-    setPendingApproveAmount(_amount);
-
-    const signer = provider.getSigner();
-    const usdcABI = [
-      "function approve(address _spender, uint256 _value) public returns (bool success)",
-    ];
-
-    // Format for the actual transaction
-    const amount = utils.parseUnits(_amount.toString(), 18);
-
-    const USDCContract = new Contract(USDC_ADDRESS, usdcABI, signer);
-
-    return USDCContract.approve(contractAddress, amount)
-      .catch((err) => handleTxnError(err))
-      .then((txn) => provider.waitForTransaction(txn.hash))
-      .then((receipt) => {
-        console.log("Approved!", receipt);
-        setPendingApproveAmount(0);
-      })
-      .catch((err) => {
-        setErrorAndClearLoading(err);
-        // don't let us continue
-        throw err;
-      });
+    await HILO.approvePayments(
+      amount,
+      provider,
+      setPendingApproveAmount,
+      setErrorAndClearLoading
+    );
   };
 
   // Buy a token
   const buyHandler = async (tokenId) => {
-    tokenId == HI_TOKEN_ID ? setHiBuyLoading(true) : setLoBuyLoading(true);
+    tokenId == CONSTANTS.HI_TOKEN_ID
+      ? setHiBuyLoading(true)
+      : setLoBuyLoading(true);
     clearBanners();
 
     checkApprovalAndPossiblyApprove(tokenId)
       .then(async () => {
         setPendingTokenBuy(tokenId);
         const signer = provider.getSigner();
-        const HILOContract = new Contract(contractAddress, contractABI, signer);
+        const HILOContract = new Contract(
+          CONSTANTS.HILO_CONTRACT_ADDRESS,
+          abi.abi,
+          signer
+        );
         return HILOContract.buy(tokenId);
       })
       .catch((err) => handleTxnError(err))
@@ -274,7 +173,7 @@ export default function Home() {
 
         setBuySuccess(true);
         setPendingTokenBuy(null);
-        tokenId == HI_TOKEN_ID
+        tokenId == CONSTANTS.HI_TOKEN_ID
           ? setHiBuyLoading(false)
           : setLoBuyLoading(false);
 
@@ -285,12 +184,18 @@ export default function Home() {
 
   // Sell a token
   const sellHandler = async (tokenId) => {
-    tokenId == HI_TOKEN_ID ? setHiSellLoading(true) : setLoSellLoading(true);
+    tokenId == CONSTANTS.HI_TOKEN_ID
+      ? setHiSellLoading(true)
+      : setLoSellLoading(true);
     clearBanners();
 
     setPendingTokenSell(tokenId);
     const signer = provider.getSigner();
-    const HILOContract = new Contract(contractAddress, contractABI, signer);
+    const HILOContract = new Contract(
+      CONSTANTS.HILO_CONTRACT_ADDRESS,
+      abi.abi,
+      signer
+    );
 
     await HILOContract.sell(tokenId)
       .then((txn) => provider.waitForTransaction(txn.hash))
@@ -300,26 +205,12 @@ export default function Home() {
 
         setSellSuccess(true);
         setPendingTokenSell(null);
-        tokenId == HI_TOKEN_ID
+        tokenId == CONSTANTS.HI_TOKEN_ID
           ? setHiSellLoading(false)
           : setLoSellLoading(false);
         updateGameState();
       })
       .catch((err) => setErrorAndClearLoading(err));
-  };
-
-  const handleTxnError = (err) => {
-    console.log(err);
-    const errCode = err.code;
-    console.log(errCode);
-    console.log(err.replacement);
-
-    // if we changed the txn, send through the new one
-    if (errCode === "TRANSACTION_REPLACED") {
-      return err.replacement;
-    } else {
-      throw err;
-    }
   };
 
   const setErrorAndClearLoading = (error) => {
@@ -346,15 +237,56 @@ export default function Home() {
 
   const updateGameState = () => {
     // get the price of the tokens
-    getPrice(HI_TOKEN_ID).catch((err) => setErrorAndClearLoading(err));
-    getPrice(LO_TOKEN_ID).catch((err) => setErrorAndClearLoading(err));
+    const hiPrice = HILO.getPrice(
+      CONSTANTS.HI_TOKEN_ID,
+      provider,
+      setHiPrice,
+      setErrorAndClearLoading
+    );
+    const loPrice = HILO.getPrice(
+      CONSTANTS.LO_TOKEN_ID,
+      provider,
+      setLoPrice,
+      setErrorAndClearLoading
+    );
+
+    // setup the game over screen if there were winners
+    if (hiPrice === loPrice) {
+      setGameOver(true);
+      getWinners().catch((err) => console.log(err));
+    }
 
     // then check if the user has any tokens
-    getBalance(HI_TOKEN_ID).catch((err) => setErrorAndClearLoading(err));
-    getBalance(LO_TOKEN_ID).catch((err) => setErrorAndClearLoading(err));
+    HILO.getBalance(
+      CONSTANTS.HI_TOKEN_ID,
+      provider,
+      setHasHi,
+      setErrorAndClearLoading
+    );
+    HILO.getBalance(
+      CONSTANTS.LO_TOKEN_ID,
+      provider,
+      setHasLo,
+      setErrorAndClearLoading
+    );
 
     // check if we're approved to make payments
-    checkApproval().catch((err) => setErrorAndClearLoading(err));
+    HILO.checkApproval(provider, setPaymentApproved).catch((err) =>
+      setErrorAndClearLoading(err)
+    );
+  };
+
+  const getWinners = async () => {
+    const HILOContract = new Contract(
+      CONSTANTS.HILO_CONTRACT_ADDRESS,
+      abi.abi,
+      provider
+    );
+
+    return HILOContract.getWinners().then((winners) => {
+      console.log(winners);
+      setWinners(winners);
+    });
   };
 
   // When the page loads!
@@ -402,185 +334,6 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallet]);
 
-  const showWalletError = (error) => {
-    console.log(error, error.message);
-    let errDisplay;
-    switch (error.message) {
-      case "bad_chain":
-        errDisplay = "Please switch to the Polygon network to play.";
-        break;
-      case "User Rejected":
-        errDisplay = "Request to connect rejected. Please try again.";
-        break;
-      default:
-        errDisplay = "Something went wrong. Please try again.";
-        break;
-    }
-    setWalletError(errDisplay);
-  };
-
-  const renderPlayer = () => {
-    const truncateAddress = (address) => {
-      if (!address) return "No Account";
-      const match = address.match(
-        /^(0x[a-zA-Z0-9]{4})[a-zA-Z0-9]+([a-zA-Z0-9]{4})$/
-      );
-      if (!match) return address;
-      return `${match[1]}…${match[2]}`;
-    };
-    return (
-      <Card
-        variant="bordered"
-        css={{ maxWidth: "300px", margin: "0 auto", padding: "10px" }}
-      >
-        <Text h4 css={{ textAlign: "center" }}>
-          Player {truncateAddress(account)} connected
-        </Text>
-      </Card>
-    );
-  };
-
-  const renderHoldings = () => (
-    <Card
-      variant="bordered"
-      css={{ maxWidth: "200px", margin: "0 auto", padding: "10px" }}
-    >
-      <Text h5 css={{ textAlign: "center" }}>
-        You have one {hasHi ? "Hi" : "Lo"} token
-      </Text>
-      <Image
-        alt="Hi or Lo token"
-        height={40}
-        src={hasHi ? "/img/hiToken.png" : "/img/loToken.png"}
-      />
-    </Card>
-  );
-
-  const renderConnectButton = () => {
-    if (wallet) {
-      return null;
-    } else {
-      return (
-        <Button
-          color="gradient"
-          size="xl"
-          css={{
-            maxWidth: "200px",
-            margin: "0 auto",
-          }}
-          onPress={connectWallet}
-        >
-          Connect wallet to play
-        </Button>
-      );
-    }
-  };
-
-  const renderApproveButton = () => (
-    <>
-      <Button
-        color="gradient"
-        size="lg"
-        css={{ maxWidth: "200px", margin: "0 auto" }}
-        onPress={() => setApproveModalVisible(true)}
-        disabled={approveButtonLoading}
-      >
-        {approveButtonLoading ? (
-          <Loading type="points-opacity" color="currentColor" size="lg" />
-        ) : (
-          "Pre-approve payments"
-        )}
-      </Button>
-      <Spacer y={1} />
-      {ConfirmApproveModal(
-        approveModalVisible,
-        setApproveModalVisible,
-        preApprovePayments
-      )}
-    </>
-  );
-
-  const renderApproveBanner = () => (
-    <Card
-      variant="bordered"
-      isPressable={approvalSuccess}
-      onPress={() => setApprovalSuccess(false)}
-    >
-      <Card.Body>
-        {approvalSuccess ? (
-          <Text b color="white" size="1.2rem" css={{ textAlign: "center" }}>
-            Successfully approved!
-          </Text>
-        ) : (
-          <Loading type="points-opacity" color="secondary" size="lg">
-            Approving{" "}
-            {pendingApproveAmount == MAX_APPROVAL_AMOUNT
-              ? "all USDC transactions..."
-              : "this USDC transaction..."}
-          </Loading>
-        )}
-      </Card.Body>
-    </Card>
-  );
-
-  const renderBuyBanner = () => {
-    const token =
-      pendingTokenBuy === HI_TOKEN_ID ? HI_TOKEN_NAME : LO_TOKEN_NAME;
-    const price = pendingTokenBuy === HI_TOKEN_ID ? hiPrice : loPrice;
-    return (
-      <Card variant="bordered">
-        <Card.Body>
-          {buySuccess ? (
-            <Text b color="white" size="lg" css={{ textAlign: "center" }}>
-              You just bought a {token} token!
-            </Text>
-          ) : (
-            <Loading type="points-opacity" color="secondary" size="lg">
-              Buying a {token} token for ${price}...
-            </Loading>
-          )}
-        </Card.Body>
-      </Card>
-    );
-  };
-
-  const renderSellBanner = () => {
-    const token =
-      pendingTokenSell === HI_TOKEN_ID ? HI_TOKEN_NAME : LO_TOKEN_NAME;
-    const price = pendingTokenSell === HI_TOKEN_ID ? hiPrice : loPrice;
-    return (
-      <Card variant="bordered">
-        <Card.Body>
-          {sellSuccess ? (
-            <Text b color="white" size="lg" css={{ textAlign: "center" }}>
-              You just sold a {token} token!
-            </Text>
-          ) : (
-            <Loading type="points-opacity" color="secondary" size="lg">
-              Selling a {token} token for ${price}...
-            </Loading>
-          )}
-        </Card.Body>
-      </Card>
-    );
-  };
-
-  const renderErrorBanner = () => (
-    <Card
-      isPressable
-      variant="flat"
-      css={{
-        backgroundColor: "#910838",
-        padding: "10px",
-      }}
-      onClick={() => setError(null)}
-    >
-      <Text b color="white" size="1.3rem" css={{ textAlign: "center" }}>
-        {error}
-      </Text>
-    </Card>
-  );
-
   return (
     <Container fluid css={{ minHeight: "100vh", position: "relative" }}>
       <Text h1 size="8rem" className={styles.title}>
@@ -594,47 +347,33 @@ export default function Home() {
             A Game of Tokens
           </Text>
           <Spacer y={10} />
-          {renderConnectButton()}
-          {walletError && (
-            <>
-              <Spacer y={2} />
-              <Card
-                isPressable={!wallet}
-                variant="bordered"
-                css={{ margin: "0 auto", maxWidth: "600px" }}
-                onPress={() => setWalletError(null)}
-              >
-                <Card.Body>
-                  <Text
-                    b
-                    color="error"
-                    size="1.3rem"
-                    css={{ textAlign: "center" }}
-                  >
-                    {walletError}
-                  </Text>
-                </Card.Body>
-              </Card>
-            </>
-          )}
+          {renderConnectButton(wallet, connectWallet)}
+          {walletError &&
+            renderWalletErrorBanner(wallet, walletError, setWalletError)}
         </>
       ) : (
         <>
           {/* Show the player */}
-          {account !== null && renderPlayer()}
+          {account !== null && renderPlayer(account)}
           <Spacer y={1} />
-          {(hasHi || hasLo) && renderHoldings()}
+          {(hasHi || hasLo) && renderHoldings(hasHi)}
           <Spacer y={2} />
 
           {/* If payment is not approved, show the button */}
-          {!paymentApproved && renderApproveButton()}
+          {!paymentApproved &&
+            renderApproveButton(
+              approveButtonLoading,
+              approveModalVisible,
+              setApproveModalVisible,
+              preApprovePayments
+            )}
 
           {/* Show the two tokens */}
           <Grid.Container gap={3} justify="center">
             <Grid xs={10} sm={6} md={4}>
               {TokenCard(
-                HI_TOKEN_NAME,
-                HI_TOKEN_ID,
+                CONSTANTS.HI_TOKEN_NAME,
+                CONSTANTS.HI_TOKEN_ID,
                 hiPrice,
                 buyHandler,
                 sellHandler,
@@ -646,8 +385,8 @@ export default function Home() {
             </Grid>
             <Grid xs={10} sm={6} md={4}>
               {TokenCard(
-                LO_TOKEN_NAME,
-                LO_TOKEN_ID,
+                CONSTANTS.LO_TOKEN_NAME,
+                CONSTANTS.LO_TOKEN_ID,
                 loPrice,
                 buyHandler,
                 sellHandler,
@@ -657,21 +396,35 @@ export default function Home() {
                 loSellLoading
               )}
             </Grid>
-            {error !== null ||
-            pendingApproveAmount > 0 ||
-            approvalSuccess ||
-            pendingTokenBuy !== null ||
-            pendingTokenSell !== null ||
-            buySuccess ||
-            sellSuccess ? (
-              <Grid xs={10} sm={12} md={8}>
-                {error !== null && renderErrorBanner()}
-                {(pendingApproveAmount > 0 || approvalSuccess) &&
-                  renderApproveBanner()}
-                {pendingTokenBuy !== null && renderBuyBanner()}
-                {pendingTokenSell !== null && renderSellBanner()}
-              </Grid>
-            ) : null}
+
+            <Grid xs={10} sm={12} md={8}>
+              {error !== null && renderErrorBanner(error, setError)}
+
+              {(pendingApproveAmount > 0 || approvalSuccess) &&
+                renderApproveBanner(
+                  approvalSuccess,
+                  pendingApproveAmount,
+                  setApprovalSuccess
+                )}
+
+              {pendingTokenBuy !== null &&
+                renderTradeBanner(
+                  "buy",
+                  hiPrice,
+                  loPrice,
+                  pendingTokenBuy,
+                  buySuccess
+                )}
+
+              {pendingTokenSell !== null &&
+                renderTradeBanner(
+                  "sell",
+                  hiPrice,
+                  loPrice,
+                  pendingTokenSell,
+                  sellSuccess
+                )}
+            </Grid>
           </Grid.Container>
         </>
       )}

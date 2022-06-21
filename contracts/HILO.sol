@@ -46,7 +46,7 @@ contract HILO is ERC1155, Ownable, Pausable {
     mapping(uint256 => Action[]) private actions;
 
     // the winners!
-    address[] private winners;
+    address[] public winners;
 
     // implement USDC for payments
     // mumbai: 0xe11A86849d99F524cAC3E7A0Ec1241828e332C62
@@ -120,6 +120,10 @@ contract HILO is ERC1155, Ownable, Pausable {
         Action memory action = Action(player, tokenId, price);
         actions[price].push(action);
         emit actionAdded(player, tokenId, price);
+    }
+
+    function getWinners() public view returns (address[] memory) {
+        return winners;
     }
 
     function priceConverged(uint256 price) private {
