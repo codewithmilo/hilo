@@ -16,6 +16,19 @@ body {
   font-family: "FogTwo", serif !important;
 }
 
+body {
+  animation: fadeIn ease 3s 1;
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
 p {
   font-family: "FogTwo", serif !important;
 }

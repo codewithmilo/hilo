@@ -45,12 +45,10 @@ export default function Home() {
   const [wallet, setWallet] = useState(null);
   const [provider, setProvider] = useState(null);
   const [account, setAccount] = useState(null);
+
   const [gameReady, setGameReady] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [winners, setWinners] = useState([]);
-
-  // keep track of whether the user has given payment approval or not
-  const [paymentApproved, setPaymentApproved] = useState(false);
 
   // updated prices of the tokens
   const [hiPrice, setHiPrice] = useState(0);
@@ -72,6 +70,7 @@ export default function Home() {
   const [approveButtonLoading, setApproveButtonLoading] = useState(false);
 
   // USDC approval banner
+  const [paymentApproved, setPaymentApproved] = useState(false);
   const [pendingApproveAmount, setPendingApproveAmount] = useState(0);
   const [approvalSuccess, setApprovalSuccess] = useState(false);
 
@@ -104,7 +103,6 @@ export default function Home() {
 
         // otherwise it ok
         setProvider(library);
-        setGameReady(true);
       })
       .catch((err) => getWalletError(err, setWalletError));
   };
@@ -259,7 +257,7 @@ export default function Home() {
     if (hiPrice === loPrice) {
       console.log("game over");
       setGameOver(true);
-      getWinners().catch((err) => console.log(err));
+      return getWinners().catch((err) => console.log(err));
     }
 
     // then check if the user has any tokens
@@ -280,6 +278,8 @@ export default function Home() {
     HILO.checkApproval(provider, setPaymentApproved).catch((err) =>
       setErrorAndClearLoading(err)
     );
+
+    setGameReady(true);
   };
 
   const getWinners = async () => {
@@ -340,6 +340,8 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallet]);
 
+  useEffect(() => {}, [gameReady, gameOver]);
+
   return (
     <Container fluid css={{ minHeight: "100vh", position: "relative" }}>
       <Text h1 size="8rem" className={styles.title}>
@@ -347,7 +349,7 @@ export default function Home() {
       </Text>
 
       {/* If wallet isn't connected, show the button. Otherwise show the game */}
-      {!gameReady ? (
+      {!wallet ? (
         <>
           <Text size="3rem" className={styles.subtitle}>
             A Game of Tokens
@@ -361,14 +363,16 @@ export default function Home() {
         <>
           {gameOver && (
             <>
-              <Spacer y={2} />
+              <Text size="3rem" className={styles.subtitle}>
+                A Game of Tokens
+              </Text>
               <Text h1 size="15vw" className={styles.gameOver}>
                 GAME OVER
               </Text>
               {renderWinners(winners)}
             </>
           )}
-          {!gameOver && (
+          {gameReady && (
             <>
               {/* Show the player */}
               {account !== null && renderPlayer(account)}
