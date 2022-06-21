@@ -6,8 +6,12 @@ import Web3Modal from "web3modal";
 import { providers, Contract, utils } from "ethers";
 
 import { Container, Text, Spacer, Grid, Card } from "@nextui-org/react";
-import { renderPlayer, renderHoldings } from "../components/playerInfo";
 import { HowToPlayModal } from "../components/modals";
+import {
+  renderPlayer,
+  renderHoldings,
+  renderWinners,
+} from "../components/playerInfo";
 import {
   renderErrorBanner,
   renderWalletErrorBanner,
@@ -235,15 +239,15 @@ export default function Home() {
     setSellSuccess(false);
   };
 
-  const updateGameState = () => {
+  const updateGameState = async () => {
     // get the price of the tokens
-    const hiPrice = HILO.getPrice(
+    const hiPrice = await HILO.getPrice(
       CONSTANTS.HI_TOKEN_ID,
       provider,
       setHiPrice,
       setErrorAndClearLoading
     );
-    const loPrice = HILO.getPrice(
+    const loPrice = await HILO.getPrice(
       CONSTANTS.LO_TOKEN_ID,
       provider,
       setLoPrice,
@@ -251,7 +255,9 @@ export default function Home() {
     );
 
     // setup the game over screen if there were winners
+    console.log("prices", hiPrice, loPrice);
     if (hiPrice === loPrice) {
+      console.log("game over");
       setGameOver(true);
       getWinners().catch((err) => console.log(err));
     }
@@ -353,79 +359,92 @@ export default function Home() {
         </>
       ) : (
         <>
-          {/* Show the player */}
-          {account !== null && renderPlayer(account)}
-          <Spacer y={1} />
-          {(hasHi || hasLo) && renderHoldings(hasHi)}
-          <Spacer y={2} />
+          {gameOver && (
+            <>
+              <Spacer y={2} />
+              <Text h1 size="15vw" className={styles.gameOver}>
+                GAME OVER
+              </Text>
+              {renderWinners(winners)}
+            </>
+          )}
+          {!gameOver && (
+            <>
+              {/* Show the player */}
+              {account !== null && renderPlayer(account)}
+              <Spacer y={1} />
+              {(hasHi || hasLo) && renderHoldings(hasHi)}
+              <Spacer y={2} />
 
-          {/* If payment is not approved, show the button */}
-          {!paymentApproved &&
-            renderApproveButton(
-              approveButtonLoading,
-              approveModalVisible,
-              setApproveModalVisible,
-              preApprovePayments
-            )}
-
-          {/* Show the two tokens */}
-          <Grid.Container gap={3} justify="center">
-            <Grid xs={10} sm={6} md={4}>
-              {TokenCard(
-                CONSTANTS.HI_TOKEN_NAME,
-                CONSTANTS.HI_TOKEN_ID,
-                hiPrice,
-                buyHandler,
-                sellHandler,
-                hasHi || hasLo || approveButtonLoading || loBuyLoading,
-                !hasHi || approveButtonLoading,
-                hiBuyLoading,
-                hiSellLoading
-              )}
-            </Grid>
-            <Grid xs={10} sm={6} md={4}>
-              {TokenCard(
-                CONSTANTS.LO_TOKEN_NAME,
-                CONSTANTS.LO_TOKEN_ID,
-                loPrice,
-                buyHandler,
-                sellHandler,
-                hasLo || hasHi || approveButtonLoading || hiBuyLoading,
-                !hasLo || approveButtonLoading,
-                loBuyLoading,
-                loSellLoading
-              )}
-            </Grid>
-
-            <Grid xs={10} sm={12} md={8}>
-              {error !== null && renderErrorBanner(error, setError)}
-
-              {(pendingApproveAmount > 0 || approvalSuccess) &&
-                renderApproveBanner(
-                  approvalSuccess,
-                  pendingApproveAmount,
-                  setApprovalSuccess
+              {/* If payment is not approved, show the button */}
+              {!paymentApproved &&
+                renderApproveButton(
+                  approveButtonLoading,
+                  approveModalVisible,
+                  setApproveModalVisible,
+                  preApprovePayments
                 )}
 
-              {pendingTokenBuy !== null &&
-                renderTradeBanner(
-                  "buy",
-                  hiPrice,
-                  loPrice,
-                  pendingTokenBuy,
-                  buySuccess
-                )}
+              {/* Show the two tokens */}
+              <Grid.Container gap={3} justify="center">
+                <Grid xs={10} sm={6} md={4}>
+                  {TokenCard(
+                    CONSTANTS.HI_TOKEN_NAME,
+                    CONSTANTS.HI_TOKEN_ID,
+                    hiPrice,
+                    buyHandler,
+                    sellHandler,
+                    hasHi || hasLo || approveButtonLoading || loBuyLoading,
+                    !hasHi || approveButtonLoading,
+                    hiBuyLoading,
+                    hiSellLoading
+                  )}
+                </Grid>
+                <Grid xs={10} sm={6} md={4}>
+                  {TokenCard(
+                    CONSTANTS.LO_TOKEN_NAME,
+                    CONSTANTS.LO_TOKEN_ID,
+                    loPrice,
+                    buyHandler,
+                    sellHandler,
+                    hasLo || hasHi || approveButtonLoading || hiBuyLoading,
+                    !hasLo || approveButtonLoading,
+                    loBuyLoading,
+                    loSellLoading
+                  )}
+                </Grid>
 
-              {pendingTokenSell !== null &&
-                renderTradeBanner(
-                  "sell",
-                  hiPrice,
-                  loPrice,
-                  pendingTokenSell,
-                  sellSuccess
-                )}
-            </Grid>
-          </Grid.Container>
+                <Grid xs={10} sm={12} md={8}>
+                  {error !== null && renderErrorBanner(error, setError)}
+
+                  {(pendingApproveAmount > 0 || approvalSuccess) &&
+                    renderApproveBanner(
+                      approvalSuccess,
+                      pendingApproveAmount,
+                      setApprovalSuccess
+                    )}
+
+                  {pendingTokenBuy !== null &&
+                    renderTradeBanner(
+                      "buy",
+                      hiPrice,
+                      loPrice,
+                      pendingTokenBuy,
+                      buySuccess
+                    )}
+
+                  {pendingTokenSell !== null &&
+                    renderTradeBanner(
+                      "sell",
+                      hiPrice,
+                      loPrice,
+                      pendingTokenSell,
+                      sellSuccess
+                    )}
+                </Grid>
+              </Grid.Container>
+            </>
+          )}
         </>
       )}
 

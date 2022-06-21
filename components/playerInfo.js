@@ -1,16 +1,16 @@
 import { Card, Text, Image } from "@nextui-org/react";
 
-const renderPlayer = (account) => {
-  // displays like 0x0420...6969
-  const truncateAddress = (address) => {
-    if (!address) return "No Account";
-    const match = address.match(
-      /^(0x[a-zA-Z0-9]{4})[a-zA-Z0-9]+([a-zA-Z0-9]{4})$/
-    );
-    if (!match) return address;
-    return `${match[1]}…${match[2]}`;
-  };
+// displays like 0x0420...6969
+const truncateAddress = (address) => {
+  if (!address) return "No Account";
+  const match = address.match(
+    /^(0x[a-zA-Z0-9]{4})[a-zA-Z0-9]+([a-zA-Z0-9]{4})$/
+  );
+  if (!match) return address;
+  return `${match[1]}…${match[2]}`;
+};
 
+const renderPlayer = (account) => {
   return (
     <Card
       variant="bordered"
@@ -39,4 +39,24 @@ const renderHoldings = (hasHi) => (
   </Card>
 );
 
-export { renderPlayer, renderHoldings };
+const renderWinners = (winners) => {
+  return (
+    <Card
+      variant="bordered"
+      css={{ maxWidth: "250px", margin: "0 auto", padding: "10px" }}
+    >
+      <Text h3 css={{ textAlign: "center" }}>
+        The winners were
+      </Text>
+      {winners.forEach((winner) => {
+        return (
+          <Text h3 css={{ textAlign: "center" }}>
+            {truncateAddress(winner)}
+          </Text>
+        );
+      })}
+    </Card>
+  );
+};
+
+export { renderPlayer, renderHoldings, renderWinners };
