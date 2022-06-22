@@ -64,6 +64,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     event loIncreased(uint256 newLoPrice);
     event actionAdded(address player, uint256 tokenId, uint256 price);
     event pricesConverged(address[] winners, uint256 price);
+    event jackpotPaid(address player, uint256 amount);
 
     constructor(
         uint256 _initialHi,
@@ -159,11 +160,14 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         _pause();
     }
 
-    function payout() public onlyOwner {
+    function payout() public onlyOwner whenPaused {
         // first pay out the winners
         uint256 winnersCount = winners.length;
+        uint256 jackpotPayout = jackpot * 1 ether;
         for (uint256 i = 0; i < winnersCount; i++) {
-            usdc.transfer(winners[i], jackpot / winnersCount);
+            uint256 amount = jackpotPayout / winnersCount;
+            usdc.transfer(winners[i], amount);
+            emit jackpotPaid(winners[i], amount);
         }
         uint256 balance = usdc.balanceOf(address(this));
         usdc.transfer(owner(), balance); // gimme the rest!
@@ -295,7 +299,9 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         // // send them LO if they sold HI
         if (tokenId == HI && balanceOf(player, LO) == 0) {
             _mint(player, LO, 1, "");
-            updateBuyCount(LO);
+            // only update the buyCount if there have been no buys yet,
+            // i.e. don't unlock selling from free LO
+            if (buyCounts[LO] == 0) updateBuyCount(LO);
             emit loSent(player);
         }
     }

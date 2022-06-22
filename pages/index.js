@@ -243,6 +243,7 @@ export default function Home() {
     setPendingTokenBuy(null);
     setPendingTokenSell(null);
     setPendingApproveAmount(0);
+    setPriceUpdatedEvent(null);
   };
 
   const updateGameState = async () => {
@@ -297,7 +298,7 @@ export default function Home() {
     setHasLo(loTokenBalance > 0);
 
     // check if we're approved to make payments
-    HILO.checkApproval(provider, setPaymentApproved, hiPrice).catch((err) =>
+    HILO.checkApproval(provider, setPaymentApproved, _hiPrice).catch((err) =>
       setErrorAndClearLoading(err)
     );
 
