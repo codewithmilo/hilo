@@ -48,9 +48,9 @@ const renderWinners = (winners) => {
       <Text h3 css={{ textAlign: "center" }}>
         The winners were
       </Text>
-      {winners.forEach((winner) => {
+      {winners.map((winner, i) => {
         return (
-          <Text h3 css={{ textAlign: "center" }}>
+          <Text h3 key={i} css={{ textAlign: "center" }}>
             {truncateAddress(winner)}
           </Text>
         );

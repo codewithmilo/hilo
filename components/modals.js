@@ -14,15 +14,24 @@ const ConfirmApproveModal = (visible, setVisible, approveFn) => (
       </Text>
     </Modal.Header>
     <Modal.Body>
-      <Text id="modal-description" size="1.3rem">
-        This will ask you to approve payments up to $1000 but you will only ever
-        be charged the shown price at the time of purchase. You will not need to
-        approve payments again.
+      <Text size="1.3rem">
+        In order to purchase a HILO token, you must grant approval for the game
+        to transfer your USDC. <br />
+        Since every purchase requires this approval and the HILO token transfer,
+        you must sign two transactions.
+        <br />
+        Pre-approval simply allows you to skip the first one by granting a large
+        allowance.
       </Text>
       <br />
       <Text size="1.3rem">
-        If you would like to wait to approve the exact amount at purchase, you
-        can simply do so when you get to it.
+        HILO will never transfer more than the price of the token at time of
+        purchase.
+      </Text>
+      <br />
+      <Text size="1.3rem">
+        If you would like to wait to only approve the exact amount at purchase,
+        you can simply do so when you get to it.
       </Text>
     </Modal.Body>
     <Modal.Footer>

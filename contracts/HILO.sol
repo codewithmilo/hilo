@@ -21,8 +21,8 @@ contract HILO is ERC1155, Ownable, Pausable {
     uint256 private loPrice;
 
     // locks for tokens at price levels
-    bool private hiLock;
-    bool private loLock;
+    bool private hiLock = true;
+    bool private loLock = true;
 
     // number of buys per price level
     uint256 private buyRequiredCount;
@@ -45,12 +45,14 @@ contract HILO is ERC1155, Ownable, Pausable {
     // store transactions by price so we can pull it when they converge
     mapping(uint256 => Action[]) private actions;
 
+    bool public gameWon = false;
+
     // the winners!
     address[] public winners;
 
     // implement USDC for payments
     // mumbai: 0xe11A86849d99F524cAC3E7A0Ec1241828e332C62
-    IERC20 public usdc;
+    IERC20 public usdc = IERC20(0xe11A86849d99F524cAC3E7A0Ec1241828e332C62);
 
     event hiDecreased(uint256 newHiPrice);
     event loIncreased(uint256 newLoPrice);
@@ -73,9 +75,6 @@ contract HILO is ERC1155, Ownable, Pausable {
         buyRequiredCount = _buyRequiredCount;
         buyCounts[HI] = 0;
         buyCounts[LO] = 0;
-        hiLock = loLock = true;
-
-        usdc = IERC20(0xe11A86849d99F524cAC3E7A0Ec1241828e332C62);
     }
 
     function getPrice(uint256 tokenId) public view returns (uint256) {
@@ -132,6 +131,8 @@ contract HILO is ERC1155, Ownable, Pausable {
         for (uint256 i = 0; i < wins.length; i++) {
             winners.push(wins[i].player);
         }
+
+        gameWon = true;
 
         // emit the prices converged event
         emit pricesConverged(winners, price);

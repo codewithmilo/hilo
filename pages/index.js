@@ -157,7 +157,7 @@ export default function Home() {
     clearBanners();
 
     checkApprovalAndPossiblyApprove(tokenId)
-      .then(async () => {
+      .then(() => {
         setPendingTokenBuy(tokenId);
         const signer = provider.getSigner();
         const HILOContract = new Contract(
@@ -174,7 +174,6 @@ export default function Home() {
         console.log(receipt);
 
         setBuySuccess(true);
-        setPendingTokenBuy(null);
         tokenId == CONSTANTS.HI_TOKEN_ID
           ? setHiBuyLoading(false)
           : setLoBuyLoading(false);
@@ -206,7 +205,6 @@ export default function Home() {
         console.log(receipt);
 
         setSellSuccess(true);
-        setPendingTokenSell(null);
         tokenId == CONSTANTS.HI_TOKEN_ID
           ? setHiSellLoading(false)
           : setLoSellLoading(false);
@@ -251,48 +249,44 @@ export default function Home() {
       setLoPrice,
       setErrorAndClearLoading
     );
+    console.log("prices", hiPrice, loPrice);
+    setHiPrice(hiPrice);
+    setLoPrice(loPrice);
 
     // setup the game over screen if there were winners
-    console.log("prices", hiPrice, loPrice);
-    if (hiPrice === loPrice) {
-      console.log("game over");
+    const gameWinners = await HILO.getWinners(
+      provider,
+      setErrorAndClearLoading
+    );
+    console.log("winners", gameWinners);
+    if (gameWinners.length) {
       setGameOver(true);
-      return getWinners().catch((err) => console.log(err));
+      setWinners(gameWinners);
     }
 
     // then check if the user has any tokens
-    HILO.getBalance(
+    const hiTokenBalance = await HILO.getBalance(
       CONSTANTS.HI_TOKEN_ID,
       provider,
       setHasHi,
       setErrorAndClearLoading
     );
-    HILO.getBalance(
+    const loTokenBalance = await HILO.getBalance(
       CONSTANTS.LO_TOKEN_ID,
       provider,
       setHasLo,
       setErrorAndClearLoading
     );
+    console.log("balances", hiTokenBalance, loTokenBalance);
+    setHasHi(hiTokenBalance > 0);
+    setHasLo(loTokenBalance > 0);
 
     // check if we're approved to make payments
-    HILO.checkApproval(provider, setPaymentApproved).catch((err) =>
+    HILO.checkApproval(provider, setPaymentApproved, hiPrice).catch((err) =>
       setErrorAndClearLoading(err)
     );
 
     setGameReady(true);
-  };
-
-  const getWinners = async () => {
-    const HILOContract = new Contract(
-      CONSTANTS.HILO_CONTRACT_ADDRESS,
-      abi.abi,
-      provider
-    );
-
-    return HILOContract.getWinners().then((winners) => {
-      console.log(winners);
-      setWinners(winners);
-    });
   };
 
   // When the page loads!
@@ -372,7 +366,7 @@ export default function Home() {
               {renderWinners(winners)}
             </>
           )}
-          {gameReady && (
+          {!gameOver && gameReady && (
             <>
               {/* Show the player */}
               {account !== null && renderPlayer(account)}
@@ -428,22 +422,26 @@ export default function Home() {
                       setApprovalSuccess
                     )}
 
-                  {pendingTokenBuy !== null &&
+                  {(pendingTokenBuy !== null || buySuccess) &&
                     renderTradeBanner(
                       "buy",
                       hiPrice,
                       loPrice,
                       pendingTokenBuy,
-                      buySuccess
+                      setPendingTokenBuy,
+                      buySuccess,
+                      setBuySuccess
                     )}
 
-                  {pendingTokenSell !== null &&
+                  {(pendingTokenSell !== null || sellSuccess) &&
                     renderTradeBanner(
                       "sell",
                       hiPrice,
                       loPrice,
                       pendingTokenSell,
-                      sellSuccess
+                      setPendingTokenSell,
+                      sellSuccess,
+                      setSellSuccess
                     )}
                 </Grid>
               </Grid.Container>

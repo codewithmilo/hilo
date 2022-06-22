@@ -35,14 +35,30 @@ const renderWalletErrorBanner = (wallet, error, setError) => (
   </>
 );
 
-const renderTradeBanner = (action, hiPrice, loPrice, pending, success) => {
+const renderTradeBanner = (
+  action,
+  hiPrice,
+  loPrice,
+  pending,
+  setPending,
+  success,
+  setSuccess
+) => {
   const token =
     pending === CONSTANTS.HI_TOKEN_ID
       ? CONSTANTS.HI_TOKEN_NAME
       : CONSTANTS.LO_TOKEN_NAME;
   const price = pending === CONSTANTS.HI_TOKEN_ID ? hiPrice : loPrice;
+
   return (
-    <Card variant="bordered">
+    <Card
+      variant="bordered"
+      isPressable
+      onPress={() => {
+        setSuccess(false);
+        setPending(null);
+      }}
+    >
       <Card.Body>
         {success ? (
           <Text b color="white" size="lg" css={{ textAlign: "center" }}>
@@ -76,10 +92,10 @@ const renderApproveBanner = (
         </Text>
       ) : (
         <Loading type="points-opacity" color="secondary" size="lg">
-          Approving{" "}
+          Granting approval for{" "}
           {pendingApproveAmount == CONSTANTS.MAX_APPROVAL_AMOUNT
-            ? "all USDC transactions..."
-            : "this USDC transaction..."}
+            ? "USDC transfers..."
+            : "this transaction..."}
         </Loading>
       )}
     </Card.Body>
