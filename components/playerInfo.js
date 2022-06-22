@@ -1,4 +1,5 @@
-import { Card, Text, Image } from "@nextui-org/react";
+import { Card, Text, Image, Link } from "@nextui-org/react";
+import { CONSTANTS } from "../lib/constants";
 
 // displays like 0x0420...6969
 const truncateAddress = (address) => {
@@ -17,7 +18,16 @@ const renderPlayer = (account) => {
       css={{ maxWidth: "300px", margin: "0 auto", padding: "10px" }}
     >
       <Text h4 css={{ textAlign: "center" }}>
-        Player {truncateAddress(account)} connected
+        Player{" "}
+        <Link
+          href={CONSTANTS.POLYSCAN_BASE_URL + account}
+          color
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {truncateAddress(account)}
+        </Link>{" "}
+        connected
       </Text>
     </Card>
   );
@@ -55,12 +65,19 @@ const renderWinners = (winners, account) => {
       ) : (
         <>
           <Text h3 css={{ textAlign: "center" }}>
-            The winners were
+            The winner is
           </Text>
           {winners.map((winner, i) => {
             return (
               <Text h3 key={i} css={{ textAlign: "center" }}>
-                {truncateAddress(winner)}
+                <Link
+                  href={CONSTANTS.POLYSCAN_BASE_URL + winner}
+                  color="secondary"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {truncateAddress(winner)}
+                </Link>
               </Text>
             );
           })}

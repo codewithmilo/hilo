@@ -17,6 +17,7 @@ import {
   renderWalletErrorBanner,
   renderTradeBanner,
   renderApproveBanner,
+  renderPriceUpdatedBanner,
 } from "../components/banners";
 import {
   renderConnectButton,
@@ -79,6 +80,7 @@ export default function Home() {
   const [pendingTokenBuy, setPendingTokenBuy] = useState(null); // this becomes 0 or 1
   const [sellSuccess, setSellSuccess] = useState(false);
   const [pendingTokenSell, setPendingTokenSell] = useState(null); // this becomes 0 or 1
+  const [priceUpdatedEvent, setPriceUpdatedEvent] = useState(null); // this becomes 0 or 1
 
   // errors
   const [error, setError] = useState(null);
@@ -151,14 +153,17 @@ export default function Home() {
 
   // Buy a token
   const buyHandler = async (tokenId) => {
-    tokenId == CONSTANTS.HI_TOKEN_ID
-      ? setHiBuyLoading(true)
-      : setLoBuyLoading(true);
+    const loadingFn =
+      tokenId == CONSTANTS.HI_TOKEN_ID ? setHiBuyLoading : setLoBuyLoading;
+    loadingFn(true);
     clearBanners();
 
     checkApprovalAndPossiblyApprove(tokenId)
       .then(() => {
+        // unload then reload, so the loading animation lines up lol
+        loadingFn(false);
         setPendingTokenBuy(tokenId);
+        loadingFn(true);
         const signer = provider.getSigner();
         const HILOContract = new Contract(
           CONSTANTS.HILO_CONTRACT_ADDRESS,
@@ -233,6 +238,9 @@ export default function Home() {
     setApprovalSuccess(false);
     setBuySuccess(false);
     setSellSuccess(false);
+    setPendingTokenBuy(null);
+    setPendingTokenSell(null);
+    setPendingApproveAmount(0);
   };
 
   const updateGameState = async () => {
@@ -321,7 +329,12 @@ export default function Home() {
       window.location.reload();
     };
 
-    HILO.setupGameEvents(provider, account, updateGameState);
+    HILO.setupGameEvents(
+      provider,
+      account,
+      updateGameState,
+      setPriceUpdatedEvent
+    );
 
     wallet.on("accountsChanged", handleAccountsChanged);
     wallet.on("chainChanged", handleChainChanged);
@@ -444,6 +457,11 @@ export default function Home() {
                       setPendingTokenSell,
                       sellSuccess,
                       setSellSuccess
+                    )}
+                  {priceUpdatedEvent !== null &&
+                    renderPriceUpdatedBanner(
+                      priceUpdatedEvent,
+                      setPriceUpdatedEvent
                     )}
                 </Grid>
               </Grid.Container>

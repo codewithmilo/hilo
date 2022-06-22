@@ -102,9 +102,26 @@ const renderApproveBanner = (
   </Card>
 );
 
+const renderPriceUpdatedBanner = (tokenId, setShowBanner) => {
+  const token = tokenId === CONSTANTS.HI_TOKEN_ID ? "Hi" : "Lo";
+  const changeStr =
+    tokenId === CONSTANTS.HI_TOKEN_ID ? "decreased" : "increased";
+
+  return (
+    <Card variant="bordered" isPressable onPress={() => setShowBanner(null)}>
+      <Card.Body>
+        <Text b color="white" size="1.2rem" css={{ textAlign: "center" }}>
+          The {token} token price has {changeStr}!
+        </Text>
+      </Card.Body>
+    </Card>
+  );
+};
+
 export {
   renderErrorBanner,
   renderWalletErrorBanner,
   renderTradeBanner,
   renderApproveBanner,
+  renderPriceUpdatedBanner,
 };

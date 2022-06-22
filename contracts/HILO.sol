@@ -3,12 +3,14 @@ pragma solidity ^0.8.0;
 
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
+
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 
-contract HILO is ERC1155, Ownable, Pausable {
+contract HILO is ERC1155Supply, Ownable, Pausable {
     uint256 public constant HI = 0;
     uint256 public constant LO = 1;
 
@@ -170,9 +172,11 @@ contract HILO is ERC1155, Ownable, Pausable {
         emit buyPriceCheck(msg.sender, tokenId, price);
 
         // update the price after the first buy so we can get the ball rolling
+        // but NOT if they have converged, waiting for a sell to complete the game
         if (
-            (price == initialLo && tokenId == LO) ||
-            (price == initialHi && tokenId == HI)
+            hiPrice != loPrice &&
+            ((price == initialLo && tokenId == LO) ||
+                (price == initialHi && tokenId == HI))
         ) {
             updatePrice(tokenId);
             emit buyPriceUpdate(msg.sender, tokenId);
