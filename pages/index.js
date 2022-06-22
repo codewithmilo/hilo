@@ -360,141 +360,147 @@ export default function Home() {
   useEffect(() => {}, [gameReady, gameOver]);
 
   return (
-    <Container fluid css={{ minHeight: "100vh", position: "relative" }}>
-      <Text h1 size="8rem" className={styles.title}>
-        HiLo
-      </Text>
+    <>
+      <Head>
+        <title>HILO</title>
+        <link rel="icon" href="/img/hilo.png" />
+      </Head>
+      <Container fluid css={{ minHeight: "100vh", position: "relative" }}>
+        <Text h1 size="8rem" className={styles.title}>
+          HiLo
+        </Text>
 
-      {/* If wallet isn't connected, show the button. Otherwise show the game */}
-      {!wallet ? (
-        <>
-          <Text size="3rem" className={styles.subtitle}>
-            A Game of Tokens
-          </Text>
-          <Spacer y={10} />
-          {renderConnectButton(wallet, connectWallet)}
-          {walletError &&
-            renderWalletErrorBanner(wallet, walletError, setWalletError)}
-        </>
-      ) : (
-        <>
-          {gameOver && (
-            <>
-              <Text size="3rem" className={styles.subtitle}>
-                A Game of Tokens
-              </Text>
-              <Text h1 size="15vw" className={styles.gameOver}>
-                GAME OVER
-              </Text>
-              {renderWinners(winners, account)}
-            </>
-          )}
-          {!gameOver && gameReady && (
-            <>
-              {/* Show the player */}
-              {account !== null && renderPlayer(account)}
-              <Spacer y={1} />
-              {playerTotals !== null && renderPlayerTotals(playerTotals)}
-              <Spacer y={1} />
-              {(hasHi || hasLo) && renderHoldings(hasHi)}
-              <Spacer y={2} />
+        {/* If wallet isn't connected, show the button. Otherwise show the game */}
+        {!wallet ? (
+          <>
+            <Text size="3rem" className={styles.subtitle}>
+              A Game of Tokens
+            </Text>
+            <Spacer y={10} />
+            {renderConnectButton(wallet, connectWallet)}
+            {walletError &&
+              renderWalletErrorBanner(wallet, walletError, setWalletError)}
+          </>
+        ) : (
+          <>
+            {gameOver && (
+              <>
+                <Text size="3rem" className={styles.subtitle}>
+                  A Game of Tokens
+                </Text>
+                <Text h1 size="15vw" className={styles.gameOver}>
+                  GAME OVER
+                </Text>
+                {renderWinners(winners, account)}
+              </>
+            )}
+            {!gameOver && gameReady && (
+              <>
+                {/* Show the player */}
+                {account !== null && renderPlayer(account)}
+                <Spacer y={1} />
+                {playerTotals !== null && renderPlayerTotals(playerTotals)}
+                <Spacer y={1} />
+                {(hasHi || hasLo) && renderHoldings(hasHi)}
+                <Spacer y={2} />
 
-              {/* If payment is not approved, show the button */}
-              {!paymentApproved &&
-                renderApproveButton(
-                  approveButtonLoading,
-                  approveModalVisible,
-                  setApproveModalVisible,
-                  preApprovePayments
-                )}
-
-              {/* Show the two tokens */}
-              <Grid.Container gap={3} justify="center">
-                <Grid xs={10} sm={6} md={4}>
-                  {TokenCard(
-                    CONSTANTS.HI_TOKEN_NAME,
-                    CONSTANTS.HI_TOKEN_ID,
-                    hiPrice,
-                    buyHandler,
-                    sellHandler,
-                    hasHi || hasLo || approveButtonLoading || loBuyLoading,
-                    !hasHi || approveButtonLoading,
-                    hiBuyLoading,
-                    hiSellLoading
+                {/* If payment is not approved, show the button */}
+                {!paymentApproved &&
+                  renderApproveButton(
+                    approveButtonLoading,
+                    approveModalVisible,
+                    setApproveModalVisible,
+                    preApprovePayments
                   )}
-                </Grid>
-                <Grid xs={10} sm={6} md={4}>
-                  {TokenCard(
-                    CONSTANTS.LO_TOKEN_NAME,
-                    CONSTANTS.LO_TOKEN_ID,
-                    loPrice,
-                    buyHandler,
-                    sellHandler,
-                    hasLo || hasHi || approveButtonLoading || hiBuyLoading,
-                    !hasLo || approveButtonLoading,
-                    loBuyLoading,
-                    loSellLoading
-                  )}
-                </Grid>
 
-                <Grid xs={10} sm={12} md={8}>
-                  {error !== null && renderErrorBanner(error, setError)}
-
-                  {(pendingApproveAmount > 0 || approvalSuccess) &&
-                    renderApproveBanner(
-                      approvalSuccess,
-                      pendingApproveAmount,
-                      setApprovalSuccess
-                    )}
-
-                  {(pendingTokenBuy !== null || buySuccess) &&
-                    renderTradeBanner(
-                      "buy",
+                {/* Show the two tokens */}
+                <Grid.Container gap={3} justify="center">
+                  <Grid xs={10} sm={6} md={4}>
+                    {TokenCard(
+                      CONSTANTS.HI_TOKEN_NAME,
+                      CONSTANTS.HI_TOKEN_ID,
                       hiPrice,
+                      buyHandler,
+                      sellHandler,
+                      hasHi || hasLo || approveButtonLoading || loBuyLoading,
+                      !hasHi || approveButtonLoading,
+                      hiBuyLoading,
+                      hiSellLoading
+                    )}
+                  </Grid>
+                  <Grid xs={10} sm={6} md={4}>
+                    {TokenCard(
+                      CONSTANTS.LO_TOKEN_NAME,
+                      CONSTANTS.LO_TOKEN_ID,
                       loPrice,
-                      pendingTokenBuy,
-                      setPendingTokenBuy,
-                      buySuccess,
-                      setBuySuccess
+                      buyHandler,
+                      sellHandler,
+                      hasLo || hasHi || approveButtonLoading || hiBuyLoading,
+                      !hasLo || approveButtonLoading,
+                      loBuyLoading,
+                      loSellLoading
                     )}
+                  </Grid>
 
-                  {(pendingTokenSell !== null || sellSuccess) &&
-                    renderTradeBanner(
-                      "sell",
-                      hiPrice,
-                      loPrice,
-                      pendingTokenSell,
-                      setPendingTokenSell,
-                      sellSuccess,
-                      setSellSuccess
-                    )}
-                  {priceUpdatedEvent !== null &&
-                    renderPriceUpdatedBanner(
-                      priceUpdatedEvent,
-                      setPriceUpdatedEvent
-                    )}
-                </Grid>
-              </Grid.Container>
-            </>
-          )}
-        </>
-      )}
+                  <Grid xs={10} sm={12} md={8}>
+                    {error !== null && renderErrorBanner(error, setError)}
 
-      <Spacer y={6} />
+                    {(pendingApproveAmount > 0 || approvalSuccess) &&
+                      renderApproveBanner(
+                        approvalSuccess,
+                        pendingApproveAmount,
+                        setApprovalSuccess
+                      )}
 
-      <footer className={styles.footer}>
-        <a
-          href="https://twitter.com/molocw"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          A MOLO production
-        </a>
-        {/* <Text className={styles.howTo} onClick={() => setHowToVisible(true)}>
+                    {(pendingTokenBuy !== null || buySuccess) &&
+                      renderTradeBanner(
+                        "buy",
+                        hiPrice,
+                        loPrice,
+                        pendingTokenBuy,
+                        setPendingTokenBuy,
+                        buySuccess,
+                        setBuySuccess
+                      )}
+
+                    {(pendingTokenSell !== null || sellSuccess) &&
+                      renderTradeBanner(
+                        "sell",
+                        hiPrice,
+                        loPrice,
+                        pendingTokenSell,
+                        setPendingTokenSell,
+                        sellSuccess,
+                        setSellSuccess
+                      )}
+                    {priceUpdatedEvent !== null &&
+                      renderPriceUpdatedBanner(
+                        priceUpdatedEvent,
+                        setPriceUpdatedEvent
+                      )}
+                  </Grid>
+                </Grid.Container>
+              </>
+            )}
+          </>
+        )}
+
+        <Spacer y={6} />
+
+        <footer className={styles.footer}>
+          <a
+            href="https://twitter.com/molocw"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            A MOLO production
+          </a>
+          {/* <Text className={styles.howTo} onClick={() => setHowToVisible(true)}>
           How to play
         </Text>
         {HowToPlayModal(howToVisible, setHowToVisible)} */}
-      </footer>
-    </Container>
+        </footer>
+      </Container>
+    </>
   );
 }
