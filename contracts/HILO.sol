@@ -225,6 +225,7 @@ contract HILO is ERC1155, Ownable, Pausable {
     event salePayment(address player, uint256 amount);
     event tokenBurned(address player, uint256 tokenId);
     event loSent(address player);
+    event priceUpdated(address player, uint256 tokenId);
 
     function _sell(address player, uint256 tokenId) private {
         // check if paused
@@ -265,6 +266,7 @@ contract HILO is ERC1155, Ownable, Pausable {
 
         // if the game is still going, update the price
         updatePrice(tokenId);
+        emit priceUpdated(player, tokenId);
 
         // // send them LO if they sold HI
         if (tokenId == HI && balanceOf(player, LO) == 0) {

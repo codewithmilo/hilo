@@ -321,6 +321,8 @@ export default function Home() {
       window.location.reload();
     };
 
+    HILO.setupGameEvents(provider, account);
+
     wallet.on("accountsChanged", handleAccountsChanged);
     wallet.on("chainChanged", handleChainChanged);
 
@@ -363,7 +365,7 @@ export default function Home() {
               <Text h1 size="15vw" className={styles.gameOver}>
                 GAME OVER
               </Text>
-              {renderWinners(winners)}
+              {renderWinners(winners, account)}
             </>
           )}
           {!gameOver && gameReady && (
@@ -460,10 +462,10 @@ export default function Home() {
         >
           A MOLO production
         </a>
-        <Text className={styles.howTo} onClick={() => setHowToVisible(true)}>
+        {/* <Text className={styles.howTo} onClick={() => setHowToVisible(true)}>
           How to play
         </Text>
-        {HowToPlayModal(howToVisible, setHowToVisible)}
+        {HowToPlayModal(howToVisible, setHowToVisible)} */}
       </footer>
     </Container>
   );

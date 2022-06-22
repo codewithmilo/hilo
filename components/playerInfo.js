@@ -39,22 +39,33 @@ const renderHoldings = (hasHi) => (
   </Card>
 );
 
-const renderWinners = (winners) => {
+const renderWinners = (winners, account) => {
+  // figure out if we won
+  const won = winners.includes(account);
+
   return (
     <Card
       variant="bordered"
       css={{ maxWidth: "250px", margin: "0 auto", padding: "10px" }}
     >
-      <Text h3 css={{ textAlign: "center" }}>
-        The winners were
-      </Text>
-      {winners.map((winner, i) => {
-        return (
-          <Text h3 key={i} css={{ textAlign: "center" }}>
-            {truncateAddress(winner)}
+      {won ? (
+        <Text h2 css={{ textAlign: "center" }}>
+          You won!!
+        </Text>
+      ) : (
+        <>
+          <Text h3 css={{ textAlign: "center" }}>
+            The winners were
           </Text>
-        );
-      })}
+          {winners.map((winner, i) => {
+            return (
+              <Text h3 key={i} css={{ textAlign: "center" }}>
+                {truncateAddress(winner)}
+              </Text>
+            );
+          })}
+        </>
+      )}
     </Card>
   );
 };
