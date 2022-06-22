@@ -9,8 +9,9 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract HILO is ERC1155Supply, Ownable, Pausable {
+contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     uint256 public constant HI = 0;
     uint256 public constant LO = 1;
 
@@ -52,6 +53,9 @@ contract HILO is ERC1155Supply, Ownable, Pausable {
     // the winners!
     address[] public winners;
 
+    // the jackpot for the game
+    uint256 public jackpot;
+
     // implement USDC for payments
     // mumbai: 0xe11A86849d99F524cAC3E7A0Ec1241828e332C62
     IERC20 public usdc = IERC20(0xe11A86849d99F524cAC3E7A0Ec1241828e332C62);
@@ -64,11 +68,23 @@ contract HILO is ERC1155Supply, Ownable, Pausable {
     constructor(
         uint256 _initialHi,
         uint256 _initialLo,
-        uint256 _buyRequiredCount
+        uint256 _buyRequiredCount,
+        uint256 _jackpot
     ) ERC1155("https://hilo-eight.vercel.app/api/tokens/{id}") {
         // set the start prices
         initialHi = hiPrice = _initialHi;
         initialLo = loPrice = _initialLo;
+
+        // ensure we can support the jackpot
+        // the first () could just be initialHi, unless we don't
+        // want to assume we are starting with 1 (let's not assume)
+        uint256 sumTotal = ((initialHi - initialLo + 1) *
+            (initialHi + initialLo)) / 2;
+        require(
+            sumTotal / 2 >= _jackpot, // I want some too!
+            "Jackpot too large for the game"
+        );
+        jackpot = _jackpot;
 
         assert(hiPrice > 0);
         assert(loPrice > 0);
@@ -143,6 +159,16 @@ contract HILO is ERC1155Supply, Ownable, Pausable {
         _pause();
     }
 
+    function payout() public onlyOwner {
+        // first pay out the winners
+        uint256 winnersCount = winners.length;
+        for (uint256 i = 0; i < winnersCount; i++) {
+            usdc.transfer(winners[i], jackpot / winnersCount);
+        }
+        uint256 balance = usdc.balanceOf(address(this));
+        usdc.transfer(owner(), balance); // gimme the rest!
+    }
+
     event buyPriceCheck(address player, uint256 tokenId, uint256 price);
     event buyPriceUpdate(address player, uint256 tokenId);
 
@@ -153,10 +179,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable {
     event shouldUnlockCheck(uint256 tokenId, bool shouldUnlock);
     event saleUnlocked(uint256 tokenId);
 
-    function buy(uint256 tokenId) public {
-        // check if paused
-        require(!paused(), "Game is paused.");
-
+    function buy(uint256 tokenId) public whenNotPaused {
         // check if the token is valid
         require(tokenId == HI || tokenId == LO, "Invalid token.");
 
@@ -219,7 +242,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable {
         }
     }
 
-    function sell(uint256 tokenId) public {
+    function sell(uint256 tokenId) public nonReentrant {
         // this is because we want to sell from the queue sometimes.
         // TBD if this will actually work, since we aren't signing the transaction
         address player = msg.sender;
@@ -231,10 +254,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable {
     event loSent(address player);
     event priceUpdated(address player, uint256 tokenId);
 
-    function _sell(address player, uint256 tokenId) private {
-        // check if paused
-        require(!paused(), "Game is paused.");
-
+    function _sell(address player, uint256 tokenId) private whenNotPaused {
         // check if the token is valid
         require(tokenId == HI || tokenId == LO, "Invalid token.");
 
