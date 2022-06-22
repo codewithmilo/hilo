@@ -9,6 +9,7 @@ import { Container, Text, Spacer, Grid, Card } from "@nextui-org/react";
 import { HowToPlayModal } from "../components/modals";
 import {
   renderPlayer,
+  renderPlayerTotals,
   renderHoldings,
   renderWinners,
 } from "../components/playerInfo";
@@ -50,6 +51,7 @@ export default function Home() {
   const [gameReady, setGameReady] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [winners, setWinners] = useState([]);
+  const [playerTotals, setPlayerTotals] = useState(null);
 
   // updated prices of the tokens
   const [hiPrice, setHiPrice] = useState(0);
@@ -245,21 +247,21 @@ export default function Home() {
 
   const updateGameState = async () => {
     // get the price of the tokens
-    const hiPrice = await HILO.getPrice(
+    const _hiPrice = await HILO.getPrice(
       CONSTANTS.HI_TOKEN_ID,
       provider,
       setHiPrice,
       setErrorAndClearLoading
     );
-    const loPrice = await HILO.getPrice(
+    const _loPrice = await HILO.getPrice(
       CONSTANTS.LO_TOKEN_ID,
       provider,
       setLoPrice,
       setErrorAndClearLoading
     );
-    console.log("prices", hiPrice, loPrice);
-    setHiPrice(hiPrice);
-    setLoPrice(loPrice);
+    console.log("prices", _hiPrice, _loPrice);
+    setHiPrice(_hiPrice);
+    setLoPrice(_loPrice);
 
     // setup the game over screen if there were winners
     const gameWinners = await HILO.getWinners(
@@ -271,6 +273,11 @@ export default function Home() {
       setGameOver(true);
       setWinners(gameWinners);
     }
+
+    // get the player totals; HI holders + LO holders
+    const _playerTotals = await HILO.getPlayerTotals(provider);
+    console.log("player totals", _playerTotals);
+    setPlayerTotals(_playerTotals);
 
     // then check if the user has any tokens
     const hiTokenBalance = await HILO.getBalance(
@@ -385,6 +392,8 @@ export default function Home() {
             <>
               {/* Show the player */}
               {account !== null && renderPlayer(account)}
+              <Spacer y={1} />
+              {playerTotals !== null && renderPlayerTotals(playerTotals)}
               <Spacer y={1} />
               {(hasHi || hasLo) && renderHoldings(hasHi)}
               <Spacer y={2} />

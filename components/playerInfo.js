@@ -1,4 +1,4 @@
-import { Card, Text, Image, Link } from "@nextui-org/react";
+import { Card, Text, Image, Link, Grid } from "@nextui-org/react";
 import { CONSTANTS } from "../lib/constants";
 
 // displays like 0x0420...6969
@@ -29,6 +29,29 @@ const renderPlayer = (account) => {
         </Link>{" "}
         connected
       </Text>
+    </Card>
+  );
+};
+
+const renderPlayerTotals = (playerTotals) => {
+  const total = playerTotals.hi + playerTotals.lo;
+
+  return (
+    <Card variant="bordered" css={{ maxWidth: "150px", margin: "0 auto" }}>
+      <Text h5 css={{ textAlign: "center" }}>
+        {total} players
+      </Text>
+      <Grid md={12} justify="center">
+        <Text h4 color="#D172F5">
+          {playerTotals.hi}
+        </Text>
+        <Text h4 css={{ padding: "0 10px" }}>
+          {"—"}
+        </Text>
+        <Text h4 color="primary">
+          {playerTotals.lo}
+        </Text>
+      </Grid>
     </Card>
   );
 };
@@ -87,4 +110,4 @@ const renderWinners = (winners, account) => {
   );
 };
 
-export { renderPlayer, renderHoldings, renderWinners };
+export { renderPlayer, renderPlayerTotals, renderHoldings, renderWinners };
