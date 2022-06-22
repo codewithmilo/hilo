@@ -321,7 +321,7 @@ export default function Home() {
       window.location.reload();
     };
 
-    HILO.setupGameEvents(provider, account);
+    HILO.setupGameEvents(provider, account, updateGameState);
 
     wallet.on("accountsChanged", handleAccountsChanged);
     wallet.on("chainChanged", handleChainChanged);
