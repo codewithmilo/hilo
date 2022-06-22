@@ -296,6 +296,13 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         updatePrice(tokenId);
         emit priceUpdated(player, tokenId);
 
+        // lock sales for the next price
+        if (tokenId == HI) {
+            hiLock = true;
+        } else {
+            loLock = true;
+        }
+
         // // send them LO if they sold HI
         if (tokenId == HI && balanceOf(player, LO) == 0) {
             _mint(player, LO, 1, "");
