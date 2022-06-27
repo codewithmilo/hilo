@@ -1,7 +1,7 @@
 const hre = require("hardhat");
 
 async function main() {
-  const hiPrice = 4;
+  const hiPrice = 5;
   const loPrice = 1;
   const buyCount = 2;
   const jackpot = 5;

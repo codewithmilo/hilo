@@ -23,21 +23,23 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     uint256 private hiPrice;
     uint256 private loPrice;
 
-    // locks for tokens at price levels
-    bool private hiLock = true;
-    bool private loLock = true;
-
     // number of buys per price level
     uint256 private buyRequiredCount;
+
+    // number of buys that push price changes (double buyRequiredCount)
+    uint256 private buyForceCount;
 
     // number of buys until sales are open
     // keep as a mapping so its easier to update
     // 0 => HI, 1 => LO
     mapping(uint256 => uint256) private buyCounts;
 
+    // same as above but for buyForceCount;
+    mapping(uint256 => uint256) private buyForceCounts;
+
     // queue for sales
     address[] private saleQueue;
-    uint256 private saleQueueIndex;
+    uint256 private saleQueueIndex = 0;
 
     struct Action {
         address player;
@@ -60,11 +62,12 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     // mumbai: 0xe11A86849d99F524cAC3E7A0Ec1241828e332C62
     IERC20 public usdc = IERC20(0xe11A86849d99F524cAC3E7A0Ec1241828e332C62);
 
-    event hiDecreased(uint256 newHiPrice);
-    event loIncreased(uint256 newLoPrice);
-    event actionAdded(address player, uint256 tokenId, uint256 price);
-    event pricesConverged(address[] winners, uint256 price);
-    event jackpotPaid(address player, uint256 amount);
+    event HiDecreased(uint256 newHiPrice);
+    event LoIncreased(uint256 newLoPrice);
+    event ActionAdded(address player, uint256 tokenId, uint256 price);
+    event PricesConverged(address[] winners, uint256 price);
+    event JackpotPaid(address player, uint256 amount);
+    event PriceUpdated(address player, uint256 tokenId);
 
     constructor(
         uint256 _initialHi,
@@ -94,6 +97,9 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         buyRequiredCount = _buyRequiredCount;
         buyCounts[HI] = 0;
         buyCounts[LO] = 0;
+        buyForceCount = _buyRequiredCount * 2;
+        buyForceCounts[HI] = 0;
+        buyForceCounts[LO] = 0;
     }
 
     function getPrice(uint256 tokenId) public view returns (uint256) {
@@ -112,32 +118,40 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         } else {
             increaseLoPrice();
         }
+
+        // reset the buy counts
+        buyCounts[tokenId] = 0;
+        buyForceCounts[tokenId] = 0;
     }
 
     function decreaseHiPrice() private {
         hiPrice = hiPrice - 1;
         assert(hiPrice >= 0);
-        emit hiDecreased(hiPrice);
+        emit HiDecreased(hiPrice);
     }
 
     function increaseLoPrice() private {
         loPrice = loPrice + 1;
         assert(loPrice <= hiPrice);
-        emit loIncreased(loPrice);
+        emit LoIncreased(loPrice);
     }
 
-    function updateBuyCount(uint256 tokenId) private returns (bool) {
-        // Update the count for the given token. return if the count should unlock
-        uint256 count = (buyCounts[tokenId] + 1) % buyRequiredCount;
-        buyCounts[tokenId] = count;
-        return count == 0;
+    function updateBuyCounts(uint256 tokenId) private {
+        // If we haven't already hit the threshold, increment the counts
+        if (buyCounts[tokenId] < buyRequiredCount) {
+            buyCounts[tokenId] = buyCounts[tokenId] + 1;
+        }
+
+        if (buyForceCounts[tokenId] < buyForceCount) {
+            buyForceCounts[tokenId] = buyForceCounts[tokenId] + 1;
+        }
     }
 
     function addAction(address player, uint256 tokenId) private {
         uint256 price = getPrice(tokenId);
         Action memory action = Action(player, tokenId, price);
         actions[price].push(action);
-        emit actionAdded(player, tokenId, price);
+        emit ActionAdded(player, tokenId, price);
     }
 
     function getWinners() public view returns (address[] memory) {
@@ -154,7 +168,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         gameWon = true;
 
         // emit the prices converged event
-        emit pricesConverged(winners, price);
+        emit PricesConverged(winners, price);
 
         // game over
         _pause();
@@ -167,21 +181,11 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         for (uint256 i = 0; i < winnersCount; i++) {
             uint256 amount = jackpotPayout / winnersCount;
             usdc.transfer(winners[i], amount);
-            emit jackpotPaid(winners[i], amount);
+            emit JackpotPaid(winners[i], amount);
         }
         uint256 balance = usdc.balanceOf(address(this));
         usdc.transfer(owner(), balance); // gimme the rest!
     }
-
-    event buyPriceCheck(address player, uint256 tokenId, uint256 price);
-    event buyPriceUpdate(address player, uint256 tokenId);
-
-    // debugging
-    event playerBalanceCheck(address player, uint256 balance);
-    event playerPayment(address player, uint256 amount);
-    event tokenMinted(address player, uint256 tokenId);
-    event shouldUnlockCheck(uint256 tokenId, bool shouldUnlock);
-    event saleUnlocked(uint256 tokenId);
 
     function buy(uint256 tokenId) public whenNotPaused {
         // check if the token is valid
@@ -196,17 +200,18 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         // get price
         uint256 price = getPrice(tokenId);
         assert(price > 0);
-        emit buyPriceCheck(msg.sender, tokenId, price);
 
-        // update the price after the first buy so we can get the ball rolling
-        // but NOT if they have converged, waiting for a sell to complete the game
-        if (
-            hiPrice != loPrice &&
-            ((price == initialLo && tokenId == LO) ||
-                (price == initialHi && tokenId == HI))
-        ) {
+        // update the price IF:
+        // 1. it is the first buy of the game — otherwise first players are forced to sell at the same price
+        // 2. We've hit buyForceCount — if there's 2x the required buys to sell, push the price to keep the game moving
+        // -- but make sure we haven't converged
+        bool firstBuy = (price == initialLo && tokenId == LO) ||
+            (price == initialHi && tokenId == HI);
+        bool forceUpdate = buyForceCounts[tokenId] == buyForceCount;
+
+        if (hiPrice != loPrice && (firstBuy || forceUpdate)) {
             updatePrice(tokenId);
-            emit buyPriceUpdate(msg.sender, tokenId);
+            emit PriceUpdated(msg.sender, tokenId);
         }
 
         // check if the player has enough to buy
@@ -214,36 +219,66 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         price = price * 1 ether;
 
         uint256 playerBalance = usdc.balanceOf(msg.sender);
-        emit playerBalanceCheck(msg.sender, playerBalance);
         require(playerBalance >= price, "Insufficient USDC balance.");
 
         // get the money
         usdc.transferFrom(msg.sender, address(this), price);
-        emit playerPayment(msg.sender, price);
 
         // mint the token for them
         _mint(msg.sender, tokenId, 1, "");
-        emit tokenMinted(msg.sender, tokenId);
 
-        // update the buy count
-        bool shouldUnlock = updateBuyCount(tokenId);
-        emit shouldUnlockCheck(tokenId, shouldUnlock);
+        // update counts, unless we hit the force update
+        if (!forceUpdate) {
+            updateBuyCounts(tokenId);
+        }
 
-        if (shouldUnlock) {
-            // unlock the sale
-            if (tokenId == HI) {
-                hiLock = false;
-            } else {
-                loLock = false;
-            }
-            emit saleUnlocked(tokenId);
+        // if we've hit the buy threshold, kick off any sales in the queue
+        if (buyCounts[tokenId] == buyRequiredCount) sellFromQueue();
+    }
 
-            // and kick off a sale if any are in the queue
-            if (saleQueue.length > 0) {
-                address nextSeller = saleQueue[saleQueueIndex++];
-                _sell(nextSeller, tokenId);
+    function addToQueue() public returns (uint256) {
+        // loop through queue to check we aren't already in it
+        bool alreadyInQueue = false;
+        for (uint256 i = saleQueueIndex; i < saleQueue.length; i++) {
+            if (saleQueue[i] == msg.sender) {
+                alreadyInQueue = true;
             }
         }
+        require(!alreadyInQueue, "HILO: already in queue");
+
+        // add to queue
+        saleQueue.push(msg.sender);
+
+        // return how many in line
+        return saleQueue.length - saleQueueIndex;
+    }
+
+    function sellFromQueue() private whenNotPaused {
+        // nothing to do if nothing in the queue!
+        if (saleQueue.length == 0) return;
+
+        // get the next player waiting in the sell queue
+        // since we can't pop from the dynamic array, we just increase the index here
+        // and the next address, whether already in line or added, will be there
+        address nextSeller = saleQueue[saleQueueIndex++];
+
+        // find out the token they have
+        uint256 tokenId;
+        uint256 hiTokenBalance;
+        uint256 loTokenBalance;
+
+        hiTokenBalance = balanceOf(nextSeller, HI);
+        if (hiTokenBalance == 0) loTokenBalance = balanceOf(nextSeller, LO);
+        if (loTokenBalance == 0) return; // no tokens to sell (must've sold manually)
+
+        if (hiTokenBalance > 0) {
+            tokenId = HI;
+        } else {
+            tokenId = LO;
+        }
+
+        // sell the token
+        _sell(nextSeller, tokenId);
     }
 
     function sell(uint256 tokenId) public nonReentrant {
@@ -252,11 +287,6 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         address player = msg.sender;
         _sell(player, tokenId);
     }
-
-    event salePayment(address player, uint256 amount);
-    event tokenBurned(address player, uint256 tokenId);
-    event loSent(address player);
-    event priceUpdated(address player, uint256 tokenId);
 
     function _sell(address player, uint256 tokenId) private whenNotPaused {
         // check if the token is valid
@@ -270,9 +300,8 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         );
 
         // check the lock is open
-        bool isLocked = tokenId == HI ? hiLock : loLock;
-        require(!isLocked, "HILO: cannot sell when the sale is locked");
-        // TODO if it isn't, add us to the queue
+        bool isUnlocked = buyCounts[tokenId] == buyRequiredCount;
+        require(isUnlocked, "HILO: cannot sell when the sale is locked");
 
         // add the action
         addAction(player, tokenId);
@@ -286,30 +315,19 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         uint256 price = getPrice(tokenId);
         price = price * 1 ether;
         usdc.transfer(player, price);
-        emit salePayment(player, price);
 
         // burn the token
         _burn(player, tokenId, 1);
-        emit tokenBurned(player, tokenId);
 
         // if the game is still going, update the price
         updatePrice(tokenId);
-        emit priceUpdated(player, tokenId);
-
-        // lock sales for the next price
-        if (tokenId == HI) {
-            hiLock = true;
-        } else {
-            loLock = true;
-        }
+        emit PriceUpdated(player, tokenId);
 
         // // send them LO if they sold HI
         if (tokenId == HI && balanceOf(player, LO) == 0) {
             _mint(player, LO, 1, "");
-            // only update the buyCount if there have been no buys yet,
-            // i.e. don't unlock selling from free LO
-            if (buyCounts[LO] == 0) updateBuyCount(LO);
-            emit loSent(player);
+            // only update the buyCount if it won't unlock selling (and force update the price)
+            if (buyCounts[LO] < buyRequiredCount - 1) updateBuyCounts(LO);
         }
     }
 
