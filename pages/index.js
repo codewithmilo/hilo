@@ -19,6 +19,7 @@ import {
   renderTradeBanner,
   renderApproveBanner,
   renderPriceUpdatedBanner,
+  renderSalesLockedBanner,
 } from "../components/banners";
 import {
   renderConnectButton,
@@ -83,6 +84,10 @@ export default function Home() {
   const [sellSuccess, setSellSuccess] = useState(false);
   const [pendingTokenSell, setPendingTokenSell] = useState(null); // this becomes 0 or 1
   const [priceUpdatedEvent, setPriceUpdatedEvent] = useState(null); // this becomes 0 or 1
+
+  const [salesLockedPending, setSalesLockedPending] = useState(false);
+  const [salesLockedSuccess, setSalesLockedSuccess] = useState(false);
+  const [salesQueueIndex, setSalesQueueIndex] = useState(0);
 
   // errors
   const [error, setError] = useState(null);
@@ -220,13 +225,33 @@ export default function Home() {
       .catch((err) => setErrorAndClearLoading(err));
   };
 
-  const setErrorAndClearLoading = (error) => {
-    console.log(error);
-    // We unset everything loading just because it's easy
-    // and we know we want nothing loading
-    setError(GetErrorMsg(error));
+  const addToQueue = async (tokenId) => {
+    console.log("Adding to queue...");
+    setSalesLockedPending(true);
+    const inline = await HILO.addToQueue(
+      provider,
+      tokenId,
+      setErrorAndClearLoading
+    );
+    console.log("Added, inline:", inline);
+    setSalesQueueIndex(inline);
+    setSalesLockedSuccess(true);
+    setSalesLockedPending(false);
     setHiSellLoading(false);
     setLoSellLoading(false);
+  };
+
+  const setErrorAndClearLoading = (error) => {
+    console.log(error);
+    const errorMsg = GetErrorMsg(error);
+    setError(errorMsg);
+
+    // We unset everything loading just because it's easy
+    // and we know we want nothing loading
+    if (errorMsg !== "sales locked") {
+      setHiSellLoading(false);
+      setLoSellLoading(false);
+    }
     setHiBuyLoading(false);
     setLoBuyLoading(false);
     setApproveButtonLoading(false);
@@ -443,7 +468,21 @@ export default function Home() {
                   </Grid>
 
                   <Grid xs={10} sm={12} md={8}>
-                    {error !== null && renderErrorBanner(error, setError)}
+                    {error !== null &&
+                      (error === "sales locked"
+                        ? renderSalesLockedBanner(
+                            () =>
+                              addToQueue(
+                                hiSellLoading
+                                  ? CONSTANTS.HI_TOKEN_ID
+                                  : CONSTANTS.LO_TOKEN_ID
+                              ),
+                            salesLockedPending,
+                            salesLockedSuccess,
+                            salesQueueIndex,
+                            () => setError(null)
+                          )
+                        : renderErrorBanner(error, setError))}
 
                     {(pendingApproveAmount > 0 || approvalSuccess) &&
                       renderApproveBanner(

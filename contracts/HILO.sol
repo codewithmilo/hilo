@@ -38,7 +38,11 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     mapping(uint256 => uint256) private buyForceCounts;
 
     // queue for sales
-    address[] private saleQueue;
+    struct saleQueueItem {
+        address player;
+        uint256 tokenId;
+    }
+    saleQueueItem[] private saleQueue;
     uint256 private saleQueueIndex = 0;
 
     struct Action {
@@ -236,18 +240,28 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         if (buyCounts[tokenId] == buyRequiredCount) sellFromQueue();
     }
 
-    function addToQueue() public returns (uint256) {
-        // loop through queue to check we aren't already in it
-        bool alreadyInQueue = false;
+    function checkInQueue() public view returns (uint256) {
+        // This one lets the saleQueue grow forever, and we keep looping through it,
+        // though we do only go through the active queue. The bet is that there will
+        // never be enough players for this to be an issue...famous last words
+        uint256 position = 1;
         for (uint256 i = saleQueueIndex; i < saleQueue.length; i++) {
-            if (saleQueue[i] == msg.sender) {
-                alreadyInQueue = true;
+            if (saleQueue[i].player == msg.sender) {
+                return position;
             }
+            position++;
         }
-        require(!alreadyInQueue, "HILO: already in queue");
+        return 0;
+    }
+
+    function addToQueue(uint256 tokenId) public returns (uint256) {
+        // check we aren't already in it
+        uint256 position = checkInQueue();
+        if (position > 0) return position;
 
         // add to queue
-        saleQueue.push(msg.sender);
+        saleQueueItem memory item = saleQueueItem(msg.sender, tokenId);
+        saleQueue.push(item);
 
         // return how many in line
         return saleQueue.length - saleQueueIndex;
@@ -260,25 +274,17 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         // get the next player waiting in the sell queue
         // since we can't pop from the dynamic array, we just increase the index here
         // and the next address, whether already in line or added, will be there
-        address nextSeller = saleQueue[saleQueueIndex++];
+        saleQueueItem memory nextSellerItem = saleQueue[saleQueueIndex++];
 
-        // find out the token they have
-        uint256 tokenId;
-        uint256 hiTokenBalance;
-        uint256 loTokenBalance;
-
-        hiTokenBalance = balanceOf(nextSeller, HI);
-        if (hiTokenBalance == 0) loTokenBalance = balanceOf(nextSeller, LO);
-        if (loTokenBalance == 0) return; // no tokens to sell (must've sold manually)
-
-        if (hiTokenBalance > 0) {
-            tokenId = HI;
-        } else {
-            tokenId = LO;
-        }
+        // make sure they still have the one they planned to sell
+        uint256 tokenBalance = balanceOf(
+            nextSellerItem.player,
+            nextSellerItem.tokenId
+        );
+        if (tokenBalance == 0) return; // no tokens to sell (must've sold manually)
 
         // sell the token
-        _sell(nextSeller, tokenId);
+        _sell(nextSellerItem.player, nextSellerItem.tokenId);
     }
 
     function sell(uint256 tokenId) public nonReentrant {

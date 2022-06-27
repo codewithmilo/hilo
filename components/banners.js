@@ -1,4 +1,4 @@
-import { Card, Loading, Text, Spacer } from "@nextui-org/react";
+import { Card, Loading, Text, Spacer, Button, Grid } from "@nextui-org/react";
 import { CONSTANTS } from "../lib/constants";
 
 const renderErrorBanner = (error, setError) => (
@@ -118,10 +118,63 @@ const renderPriceUpdatedBanner = (tokenId, setShowBanner) => {
   );
 };
 
+const renderSalesLockedBanner = (add, loading, success, inlineCount, close) => {
+  let countStr;
+  if (success) {
+    if (inlineCount === 0) {
+      countStr = "As soon as selling unlocks, your token will be sold.";
+    } else {
+      countStr = "There are " + inlineCount;
+      countStr +=
+        (inlineCount === 1 ? " player" : " players") + " ahead of you.";
+    }
+  }
+
+  return (
+    <Card variant="bordered" css={{ margin: "0 auto" }}>
+      <Card.Body>
+        {success && (
+          <Text b size="1.3rem" css={{ textAlign: "center" }}>
+            You have been added to the sale queue! {countStr}
+          </Text>
+        )}
+        {loading && (
+          <Loading type="points-opacity" color="secondary" size="lg">
+            Adding you to the sale queue...
+          </Loading>
+        )}
+        {!success && !loading && (
+          <>
+            <Text b size="1.3rem" css={{ textAlign: "center" }}>
+              Sales are currently locked at this price. <br />
+              You can allow HILO to sell for you at the next opportunity by
+              entering the sale queue.
+            </Text>
+            <Spacer y={1} />
+            <Grid.Container justify="space-evenly">
+              <Button onPress={close} color="error" css={{ maxWidth: "200px" }}>
+                Cancel
+              </Button>
+              <Button
+                onPress={add}
+                color="gradient"
+                css={{ maxWidth: "200px" }}
+              >
+                Enter Queue
+              </Button>
+            </Grid.Container>
+          </>
+        )}
+      </Card.Body>
+    </Card>
+  );
+};
+
 export {
   renderErrorBanner,
   renderWalletErrorBanner,
   renderTradeBanner,
   renderApproveBanner,
   renderPriceUpdatedBanner,
+  renderSalesLockedBanner,
 };
