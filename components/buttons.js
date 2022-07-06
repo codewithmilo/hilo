@@ -55,6 +55,7 @@ const renderRegisterButton = (account, setRegistered, loading, setLoading) => {
         color="gradient"
         shadow
         bordered
+        disabled={loading}
         size="xl"
         css={{
           maxWidth: "200px",
@@ -62,9 +63,7 @@ const renderRegisterButton = (account, setRegistered, loading, setLoading) => {
         }}
       >
         {loading ? (
-          <Loading type="points-opacity" size="md">
-            Registering your address...
-          </Loading>
+          <Text size="1.5rem">Registering your address...</Text>
         ) : (
           <Text size="1.5rem">Start playing!</Text>
         )}

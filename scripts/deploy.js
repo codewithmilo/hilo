@@ -10,10 +10,10 @@ async function main() {
   const HILO = await hre.ethers.getContractFactory("HILO");
   const token = await HILO.deploy(hiPrice, loPrice, buyCount, jackpot);
 
+  console.log("Deploying token...", token.deployTransaction.hash);
   await token.deployed();
 
   console.log("Token deployed to:", token.address);
-  console.log("TXN info: ", token.deployTransaction);
   console.log("Don't forget to update HILO.json with the new ABI!");
   console.log("And then, update constants.js with the new contract address!");
 
