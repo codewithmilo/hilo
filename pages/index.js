@@ -23,6 +23,7 @@ import {
 } from "../components/banners";
 import {
   renderConnectButton,
+  renderRegisterButton,
   renderApproveButton,
   TokenCard,
 } from "../components/buttons";
@@ -48,6 +49,9 @@ export default function Home() {
   const [wallet, setWallet] = useState(null);
   const [provider, setProvider] = useState(null);
   const [account, setAccount] = useState(null);
+
+  const [registered, setRegistered] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
 
   const [gameReady, setGameReady] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -343,8 +347,7 @@ export default function Home() {
   useEffect(() => {
     if (!wallet) return;
 
-    if (wallet && provider) updateGameState();
-
+    // HANDLE WALLET CHANGES
     const handleAccountsChanged = (accounts) => {
       console.log("accountsChanged", accounts);
       if (!accounts.length) {
@@ -355,22 +358,29 @@ export default function Home() {
       }
       window.location.reload();
     };
-
     const handleChainChanged = (chainId) => {
       console.log("chainChanged", chainId);
       // ethers said to just do this. fair!
       window.location.reload();
     };
 
-    HILO.setupGameEvents(
-      provider,
-      account,
-      updateGameState,
-      setPriceUpdatedEvent
-    );
-
     wallet.on("accountsChanged", handleAccountsChanged);
     wallet.on("chainChanged", handleChainChanged);
+
+    // HANDLE REGISTRATION
+    if (wallet && !registered) {
+      (async function () {
+        const res = HILO.checkPlayerRegistered(provider, account);
+        return await res;
+      })().then((res) => setRegistered(res));
+    }
+
+    if (wallet && provider && registered) updateGameState();
+
+    HILO.setupGameEvents(provider, account, updateGameState, () => {
+      clearBanners();
+      setPriceUpdatedEvent(true);
+    });
 
     return () => {
       if (wallet.removeListener) {
@@ -382,7 +392,12 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallet]);
 
-  useEffect(() => {}, [gameReady, gameOver]);
+  useEffect(() => {
+    if (!registered) return;
+    console.log("registered useEffect", registered);
+    updateGameState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registered]);
 
   return (
     <>
@@ -396,17 +411,27 @@ export default function Home() {
         </Text>
 
         {/* If wallet isn't connected, show the button. Otherwise show the game */}
-        {!wallet ? (
+        {(!wallet || !registered) && (
           <>
             <Text size="3rem" className={styles.subtitle}>
               A Game of Tokens
             </Text>
             <Spacer y={10} />
-            {renderConnectButton(wallet, connectWallet)}
+            {!wallet && renderConnectButton(wallet, connectWallet)}
+            {wallet &&
+              !registered &&
+              renderRegisterButton(
+                account,
+                setRegistered,
+                registerLoading,
+                setRegisterLoading
+              )}
             {walletError &&
               renderWalletErrorBanner(wallet, walletError, setWalletError)}
           </>
-        ) : (
+        )}
+
+        {wallet && registered && (
           <>
             {gameOver && (
               <>
@@ -526,7 +551,7 @@ export default function Home() {
 
         <Spacer y={6} />
 
-        <footer className={styles.footer}>
+        {/* <footer className={styles.footer}>
           <a
             href="https://twitter.com/molocw"
             target="_blank"
@@ -537,8 +562,8 @@ export default function Home() {
           {/* <Text className={styles.howTo} onClick={() => setHowToVisible(true)}>
           How to play
         </Text>
-        {HowToPlayModal(howToVisible, setHowToVisible)} */}
-        </footer>
+        {HowToPlayModal(howToVisible, setHowToVisible)}
+        </footer> */}
       </Container>
     </>
   );

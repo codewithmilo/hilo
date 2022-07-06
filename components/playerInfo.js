@@ -34,12 +34,10 @@ const renderPlayer = (account) => {
 };
 
 const renderPlayerTotals = (playerTotals) => {
-  const total = playerTotals.hi + playerTotals.lo;
-
   return (
     <Card variant="bordered" css={{ maxWidth: "150px", margin: "0 auto" }}>
       <Text h5 css={{ textAlign: "center" }}>
-        {total} players
+        {playerTotals.registered} players
       </Text>
       <Grid md={12} justify="center">
         <Text h4 color="#D172F5">

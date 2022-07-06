@@ -8,7 +8,7 @@ module.exports = {
   networks: {
     hardhat: {},
     matic: {
-      url: "https://matic-mumbai.chainstacklabs.com	",
+      url: process.env.ALCHEMY_URL,
       accounts: [process.env.PRIVATE_KEY],
     },
   },
@@ -25,13 +25,3 @@ module.exports = {
     },
   },
 };
-
-// // This is a sample Hardhat task. To learn how to create your own go to
-// // https://hardhat.org/guides/create-task.html
-// task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
-//   const accounts = await hre.ethers.getSigners();
-
-//   for (const account of accounts) {
-//     console.log(account.address);
-//   }
-// });

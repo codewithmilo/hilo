@@ -54,6 +54,10 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     // store transactions by price so we can pull it when they converge
     mapping(uint256 => Action[]) private actions;
 
+    // the list of players. they must be "registered" to play, to try to block bots
+    mapping(address => uint256) private players;
+    uint256 public playerCount;
+
     bool public gameWon = false;
 
     // the winners!
@@ -72,6 +76,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     event PricesConverged(address[] winners, uint256 price);
     event JackpotPaid(address player, uint256 amount);
     event PriceUpdated(address player, uint256 tokenId);
+    event PlayerRegistered(address player);
 
     constructor(
         uint256 _initialHi,
@@ -104,6 +109,18 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         buyForceCount = _buyRequiredCount * 2;
         buyForceCounts[HI] = 0;
         buyForceCounts[LO] = 0;
+    }
+
+    // Only owner can register: bot prevention tactic!
+    function registerPlayer(address player) public onlyOwner {
+        require(players[player] == 0, "Player already registered");
+        players[player] = 1;
+        playerCount = playerCount + 1;
+        emit PlayerRegistered(player);
+    }
+
+    function checkPlayerRegistered(address player) public view returns (bool) {
+        return players[player] == 1;
     }
 
     function getPrice(uint256 tokenId) public view returns (uint256) {
@@ -192,6 +209,9 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     }
 
     function buy(uint256 tokenId) public whenNotPaused {
+        // make sure they are registered
+        require(players[msg.sender] == 1, "Unregistered player");
+
         // check if the token is valid
         require(tokenId == HI || tokenId == LO, "Invalid token.");
 
@@ -241,6 +261,9 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     }
 
     function checkInQueue() public view returns (uint256) {
+        // make sure they are registered
+        require(players[msg.sender] == 1, "Unregistered player");
+
         // This one lets the saleQueue grow forever, and we keep looping through it,
         // though we do only go through the active queue. The bet is that there will
         // never be enough players for this to be an issue...famous last words
@@ -249,12 +272,15 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
             if (saleQueue[i].player == msg.sender) {
                 return position;
             }
-            position++;
+            position += 1;
         }
         return 0;
     }
 
     function addToQueue(uint256 tokenId) public returns (uint256) {
+        // make sure they are registered
+        require(players[msg.sender] == 1, "Unregistered player");
+
         // check we aren't already in it
         uint256 position = checkInQueue();
         if (position > 0) return position;
@@ -288,6 +314,9 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     }
 
     function sell(uint256 tokenId) public nonReentrant {
+        // make sure they are registered
+        require(players[msg.sender] == 1, "Unregistered player");
+
         // this is because we want to sell from the queue sometimes.
         // TBD if this will actually work, since we aren't signing the transaction
         address player = msg.sender;
@@ -345,12 +374,9 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         uint256[] memory amounts,
         bytes memory data
     ) internal override whenNotPaused {
-        // Minting, burning, or to/from HILO. No player transfers allowed
+        // Minting or burning. No player transfers allowed
         require(
-            from == address(0) ||
-                to == address(0) ||
-                from == address(this) ||
-                to == address(this),
+            from == address(0) || to == address(0),
             "HILO: non transferrable"
         );
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);

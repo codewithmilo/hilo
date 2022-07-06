@@ -21,6 +21,64 @@ const renderConnectButton = (wallet, connectWallet) => {
   }
 };
 
+const renderRegisterButton = (account, setRegistered, loading, setLoading) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    console.log("Registering account...");
+
+    const data = {
+      address: e.target.address.value,
+      account,
+    };
+
+    try {
+      const response = await fetch("/api/register", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+      const result = await response.json();
+      console.log(result);
+      if (result.ok) setRegistered(true);
+    } catch (error) {
+      console.log(error);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="text" id="address" />
+      <Button
+        type="submit"
+        color="gradient"
+        shadow
+        bordered
+        size="xl"
+        css={{
+          maxWidth: "200px",
+          margin: "0 auto",
+        }}
+      >
+        {loading ? (
+          <Loading type="points-opacity" size="md">
+            Registering your address...
+          </Loading>
+        ) : (
+          <Text size="1.5rem">Start playing!</Text>
+        )}
+      </Button>
+      <style jsx>{`
+        #address {
+          position: absolute;
+          top: -10000px;
+        }
+      `}</style>
+    </form>
+  );
+};
+
 const renderApproveButton = (
   approveButtonLoading,
   approveModalVisible,
@@ -94,4 +152,9 @@ const TokenCard = (
   </Card>
 );
 
-export { renderConnectButton, renderApproveButton, TokenCard };
+export {
+  renderConnectButton,
+  renderRegisterButton,
+  renderApproveButton,
+  TokenCard,
+};
