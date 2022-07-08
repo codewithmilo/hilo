@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import "hardhat/console.sol";
-import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -55,7 +54,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     mapping(uint256 => Action[]) private actions;
 
     // the list of players. they must be "registered" to play, to try to block bots
-    mapping(address => bool) private players;
+    mapping(address => bool) public players;
     uint256 public playerCount;
 
     bool public gameWon = false;
@@ -112,15 +111,11 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     }
 
     // Only owner can register: bot prevention tactic!
-    function registerPlayer(address _player) public onlyOwner {
-        require(players[_player] != true, "Player already registered");
-        players[_player] = true;
-        playerCount += 1;
-        emit PlayerRegistered(_player);
-    }
-
-    function checkPlayerRegistered(address player) public view returns (bool) {
-        return players[player] == true;
+    function registerPlayer(address player) public onlyOwner {
+        require(!players[player], "Player already registered");
+        players[player] = true;
+        playerCount = playerCount + 1;
+        emit PlayerRegistered(player);
     }
 
     function getPrice(uint256 tokenId) public view returns (uint256) {
@@ -210,7 +205,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
 
     function buy(uint256 tokenId) public whenNotPaused {
         // make sure they are registered
-        require(checkPlayerRegistered(msg.sender), "Unregistered player");
+        require(players[msg.sender], "Unregistered player");
 
         // check if the token is valid
         require(tokenId == HI || tokenId == LO, "Invalid token.");
@@ -262,7 +257,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
 
     function checkInQueue() public view returns (uint256) {
         // make sure they are registered
-        require(checkPlayerRegistered(msg.sender), "Unregistered player");
+        require(players[msg.sender], "Unregistered player");
 
         // This one lets the saleQueue grow forever, and we keep looping through it,
         // though we do only go through the active queue. The bet is that there will
@@ -279,7 +274,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
 
     function addToQueue(uint256 tokenId) public returns (uint256) {
         // make sure they are registered
-        require(checkPlayerRegistered(msg.sender), "Unregistered player");
+        require(players[msg.sender], "Unregistered player");
 
         // check we aren't already in it
         uint256 position = checkInQueue();
@@ -315,7 +310,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
 
     function sell(uint256 tokenId) public nonReentrant {
         // make sure they are registered
-        require(checkPlayerRegistered(msg.sender), "Unregistered player");
+        require(players[msg.sender], "Unregistered player");
 
         // this is because we want to sell from the queue sometimes.
         // TBD if this will actually work, since we aren't signing the transaction
@@ -380,5 +375,13 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
             "HILO: non transferrable"
         );
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+    }
+
+    function _transferOwnership(address newOwner) internal override {
+        require(
+            owner() == address(0) || newOwner == owner(),
+            "HILO: cannot transfer ownership to"
+        );
+        super._transferOwnership(newOwner);
     }
 }

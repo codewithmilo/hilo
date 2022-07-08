@@ -10,8 +10,9 @@ export default async function handler(req, res) {
   if (body.address) res.status(200).json({ ok: false });
 
   // connect as owner
-  const provider = new ethers.providers.JsonRpcProvider(
-    process.env.ALCHEMY_URL
+  const provider = new ethers.providers.AlchemyProvider(
+    "maticmum",
+    process.env.ALCHEMY_KEY
   );
   const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
@@ -25,13 +26,15 @@ export default async function handler(req, res) {
   // register the user
   let receipt;
   try {
-    console.log("========================= GAS =========================");
-    let gasEstimate = await contract.estimateGas.registerPlayer(body.account);
-    console.log("registerPlayer gas:", gasEstimate.toNumber());
+    // console.log("====================== TXN ===========================");
+    // const txn = await contract.addToQueue(1);
+    // console.log(txn);
+    // receipt = await txn.wait();
+    // console.log(receipt);
 
     console.log("====================== TXN ===========================");
     const txn = await contract.registerPlayer(body.account, {
-      gasPrice: gasEstimate * 2,
+      gasLimit: 100000,
     });
     console.log(txn);
     receipt = await txn.wait();

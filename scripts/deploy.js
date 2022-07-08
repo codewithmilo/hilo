@@ -17,7 +17,29 @@ async function main() {
   console.log("Don't forget to update HILO.json with the new ABI!");
   console.log("And then, update constants.js with the new contract address!");
 
-  // After this finishes, run `npx hardhat verify ~token.address~ ~hiPrice~ ~loPrice~ ~buyCount~` to verify
+  // const signer = await hre.ethers.getSigner();
+
+  // let registered = await token.players(signer.address);
+  // console.log(
+  //   "======================= registered ==========================",
+  //   registered
+  // );
+
+  // console.log("Calling registerPlayer...");
+
+  // const txn = await token.registerPlayer(signer.address);
+  // console.log("======================= txn ==========================", txn);
+  // const receipt = await txn.wait();
+  // console.log(
+  //   "======================= receipt ==========================",
+  //   receipt
+  // );
+
+  // registered = await token.players(signer.address);
+  // console.log(
+  //   "======================= registered ==========================",
+  //   registered
+  // );
 }
 
 // We recommend this pattern to be able to use async/await everywhere

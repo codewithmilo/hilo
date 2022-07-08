@@ -104,8 +104,6 @@ export default function Home() {
         const library = new providers.Web3Provider(instance);
         const accounts = await library.listAccounts();
         const network = await library.getNetwork();
-        console.log("Provider: ", library);
-        console.log("Signer: ", library.getSigner());
 
         setWallet(instance);
         if (accounts) setAccount(accounts[0]);
