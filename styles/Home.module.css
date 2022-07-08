@@ -40,22 +40,9 @@
   cursor: pointer;
 }
 
-.footer {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  display: flex;
-  flex: 1;
-  padding: 1rem 0;
-  border-top: 1px solid #eaeaea;
-  justify-content: center;
-  align-items: center;
+.howTo {
+  font-size: 1.2rem;
 }
-
-.footer a {
-  text-decoration: none;
-  color: white;
-}
-.footer a:hover {
-  text-decoration: none;
+.howTo:hover {
+  cursor: pointer;
 }

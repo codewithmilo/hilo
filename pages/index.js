@@ -5,7 +5,7 @@ import styles from "../styles/Home.module.css";
 import Web3Modal from "web3modal";
 import { providers, Contract, utils } from "ethers";
 
-import { Container, Text, Spacer, Grid, Card } from "@nextui-org/react";
+import { Container, Text, Spacer, Grid, Card, Link } from "@nextui-org/react";
 import { HowToPlayModal } from "../components/modals";
 import {
   renderPlayer,
@@ -422,18 +422,19 @@ export default function Home() {
             <Text size="3rem" className={styles.subtitle}>
               A Game of Tokens
             </Text>
+            {walletError &&
+              renderWalletErrorBanner(wallet, walletError, setWalletError)}
             <Spacer y={10} />
             {!wallet && renderConnectButton(wallet, connectWallet)}
             {wallet &&
               !registered &&
+              !walletError &&
               renderRegisterButton(
                 account,
                 setRegistered,
                 registerLoading,
                 setRegisterLoading
               )}
-            {walletError &&
-              renderWalletErrorBanner(wallet, walletError, setWalletError)}
           </>
         )}
 
@@ -458,20 +459,17 @@ export default function Home() {
                 {playerTotals !== null && renderPlayerTotals(playerTotals)}
                 <Spacer y={1} />
                 {(hasHi || hasLo) && renderHoldings(hasHi)}
-                <Spacer y={2} />
 
-                {/* If payment is not approved, show the button */}
-                {!paymentApproved &&
-                  renderApproveButton(
-                    approveButtonLoading,
-                    approveModalVisible,
-                    setApproveModalVisible,
-                    preApprovePayments
+                {/* If we get a price updated event, show the banner at the top */}
+                {priceUpdatedEvent !== null &&
+                  renderPriceUpdatedBanner(
+                    priceUpdatedEvent,
+                    setPriceUpdatedEvent
                   )}
 
                 {/* Show the two tokens */}
-                <Grid.Container gap={3} justify="center">
-                  <Grid xs={10} sm={6} md={4}>
+                <Grid.Container gap={1} justify="center">
+                  <Grid xs={6} sm={6} md={4}>
                     {TokenCard(
                       CONSTANTS.HI_TOKEN_NAME,
                       CONSTANTS.HI_TOKEN_ID,
@@ -484,7 +482,7 @@ export default function Home() {
                       hiSellLoading
                     )}
                   </Grid>
-                  <Grid xs={10} sm={6} md={4}>
+                  <Grid xs={6} sm={6} md={4}>
                     {TokenCard(
                       CONSTANTS.LO_TOKEN_NAME,
                       CONSTANTS.LO_TOKEN_ID,
@@ -515,13 +513,6 @@ export default function Home() {
                           )
                         : renderErrorBanner(error, setError))}
 
-                    {(pendingApproveAmount > 0 || approvalSuccess) &&
-                      renderApproveBanner(
-                        approvalSuccess,
-                        pendingApproveAmount,
-                        setApprovalSuccess
-                      )}
-
                     {(pendingTokenBuy !== null || buySuccess) &&
                       renderTradeBanner(
                         "buy",
@@ -543,13 +534,25 @@ export default function Home() {
                         sellSuccess,
                         setSellSuccess
                       )}
-                    {priceUpdatedEvent !== null &&
-                      renderPriceUpdatedBanner(
-                        priceUpdatedEvent,
-                        setPriceUpdatedEvent
-                      )}
                   </Grid>
                 </Grid.Container>
+
+                {/* If payment is not approved, show the button */}
+                <Spacer y={1} />
+                {(pendingApproveAmount > 0 || approvalSuccess) &&
+                  renderApproveBanner(
+                    approvalSuccess,
+                    pendingApproveAmount,
+                    setApprovalSuccess
+                  )}
+                {!paymentApproved &&
+                  pendingApproveAmount === 0 &&
+                  renderApproveButton(
+                    approveButtonLoading,
+                    approveModalVisible,
+                    setApproveModalVisible,
+                    preApprovePayments
+                  )}
               </>
             )}
           </>
@@ -557,19 +560,32 @@ export default function Home() {
 
         <Spacer y={6} />
 
-        {/* <footer className={styles.footer}>
-          <a
-            href="https://twitter.com/molocw"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            A MOLO production
-          </a>
-          {/* <Text className={styles.howTo} onClick={() => setHowToVisible(true)}>
-          How to play
-        </Text>
-        {HowToPlayModal(howToVisible, setHowToVisible)}
-        </footer> */}
+        <Grid.Container gap={3} justify="space-evenly">
+          <Grid>
+            <Link
+              block
+              icon
+              href="https://twitter.com/molocw"
+              target="_blank"
+              rel="noopener noreferrer"
+              css={{ fontSize: "1.2rem" }}
+            >
+              Twitter
+            </Link>
+          </Grid>
+          <Grid>
+            <Link
+              block
+              color="text"
+              href={null}
+              className={styles.howTo}
+              onClick={() => setHowToVisible(true)}
+            >
+              How to play
+            </Link>
+            {HowToPlayModal(howToVisible, setHowToVisible)}
+          </Grid>
+        </Grid.Container>
       </Container>
     </>
   );

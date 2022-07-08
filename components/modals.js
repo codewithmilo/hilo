@@ -49,11 +49,15 @@ const HowToPlayModal = (visible, setVisible) => {
   if (visible) {
     return (
       <Modal
-        blur
+        scroll
         closeButton
-        onClose={() => setVisible(false)}
+        onClose={() => {
+          setVisible(false);
+          console.log(document.getElementById("nextui-modal"));
+          window.$("#nextui-modal").modal("hide");
+        }}
         open={visible}
-        className="modal"
+        fullScreen
       >
         <Modal.Header>
           <Text h1>How to Play</Text>
@@ -64,7 +68,7 @@ const HowToPlayModal = (visible, setVisible) => {
             <br />
             <b>Lo</b> starts at <b>$1</b>
             <br />
-            <b>Hi</b> starts at <b>$1,000</b>
+            <b>Hi</b> starts at <b>$100</b>
           </Text>
           <Text size="1.5rem">
             If there are two buys of a single token

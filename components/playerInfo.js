@@ -22,6 +22,7 @@ const renderPlayer = (account) => {
         <Link
           href={CONSTANTS.POLYSCAN_BASE_URL + account}
           color
+          underline
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -39,12 +40,12 @@ const renderPlayerTotals = (playerTotals) => {
       <Text h5 css={{ textAlign: "center" }}>
         {playerTotals.registered} players
       </Text>
-      <Grid md={12} justify="center">
+      <Grid xs={12} md={12} justify="center">
         <Text h4 color="#D172F5">
           {playerTotals.hi}
         </Text>
         <Text h4 css={{ padding: "0 10px" }}>
-          {"—"}
+          {"|"}
         </Text>
         <Text h4 color="primary">
           {playerTotals.lo}
