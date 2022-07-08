@@ -45,6 +45,8 @@ if (typeof window !== "undefined") {
 }
 
 export default function Home() {
+  const [pageLoaded, setPageLoaded] = useState(false);
+
   // the wallet provider
   const [wallet, setWallet] = useState(null);
   const [provider, setProvider] = useState(null);
@@ -334,18 +336,28 @@ export default function Home() {
     setGameReady(true);
   };
 
-  // When the page loads!
+  // When the page loads: try to connect wallet (or show connect button)
   useEffect(() => {
     if (web3Modal.cachedProvider) {
-      // web3Modal.clearCachedProvider();
       connectWallet();
+    } else {
+      // we can show the page, there's no wallet
+      setPageLoaded(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Setup game info, setup listeners for wallet changes
+  // When we have a wallet: get registration (or show register button)
+  // also setup wallet events
   useEffect(() => {
     if (!wallet) return;
+
+    // set the registration status
+    HILO.checkPlayerRegistered(provider, account).then((res) => {
+      // not registered, show the button
+      if (!res) setPageLoaded(true);
+      setRegistered(res);
+    });
 
     // HANDLE WALLET CHANGES
     const handleAccountsChanged = (accounts) => {
@@ -367,37 +379,31 @@ export default function Home() {
     wallet.on("accountsChanged", handleAccountsChanged);
     wallet.on("chainChanged", handleChainChanged);
 
-    // HANDLE REGISTRATION
-    if (wallet && !registered) {
-      (async function () {
-        const res = HILO.checkPlayerRegistered(provider, account);
-        return await res;
-      })().then((res) => setRegistered(res));
-    }
-
-    if (wallet && provider && registered) updateGameState();
-
-    HILO.setupGameEvents(provider, account, updateGameState, () => {
-      clearBanners();
-      setPriceUpdatedEvent(true);
-    });
-
     return () => {
       if (wallet.removeListener) {
         wallet.removeListener("accountsChanged", handleAccountsChanged);
         wallet.removeListener("chainChanged", handleChainChanged);
       }
     };
+  }, [wallet, account, provider]);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallet]);
-
+  // When we are registered, set up the game
   useEffect(() => {
-    if (!registered) return;
-    console.log("registered useEffect", registered);
-    updateGameState();
+    if (!wallet || !registered) return;
+
+    updateGameState()
+      .then(
+        HILO.setupGameEvents(provider, account, updateGameState, () => {
+          clearBanners();
+          setPriceUpdatedEvent(true);
+        })
+      )
+      .then(() => setPageLoaded(true));
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registered]);
+
+  if (!pageLoaded) return null;
 
   return (
     <>
