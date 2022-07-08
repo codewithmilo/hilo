@@ -51,11 +51,7 @@ const HowToPlayModal = (visible, setVisible) => {
       <Modal
         scroll
         closeButton
-        onClose={() => {
-          setVisible(false);
-          console.log(document.getElementById("nextui-modal"));
-          window.$("#nextui-modal").modal("hide");
-        }}
+        onClose={() => setVisible(false)}
         open={visible}
         fullScreen
       >
