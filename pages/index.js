@@ -3,6 +3,7 @@ import Head from "next/head";
 import styles from "../styles/Home.module.css";
 
 import Web3Modal from "web3modal";
+import WalletConnectProvider from "@walletconnect/web3-provider";
 import { providers, Contract, utils } from "ethers";
 
 import { Container, Text, Spacer, Grid, Card, Link } from "@nextui-org/react";
@@ -38,7 +39,17 @@ let web3Modal;
 if (typeof window !== "undefined") {
   web3Modal = new Web3Modal({
     network: CONSTANTS.CHAIN_NAME,
-    providerOptions: {},
+    providerOptions: {
+      walletconnect: {
+        package: WalletConnectProvider,
+        options: {
+          rpc: {
+            80001: "https://rpc-mumbai.maticvigil.com",
+            137: "https://polygon-rpc.com",
+          },
+        },
+      },
+    },
     theme: "dark",
     cacheProvider: true,
   });
