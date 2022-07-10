@@ -1,4 +1,4 @@
-import { Button, Modal, Text } from "@nextui-org/react";
+import { Button, Grid, Link, Modal, Spacer, Text } from "@nextui-org/react";
 
 const ConfirmApproveModal = (visible, setVisible, approveFn) => (
   <Modal
@@ -59,33 +59,80 @@ const HowToPlayModal = (visible, setVisible) => {
           <Text h1>How to Play</Text>
         </Modal.Header>
         <Modal.Body>
-          <Text size="1.5rem">
-            Buy a <b>Hi</b> or <b>Lo</b> token (with USDC)
+          <Link
+            block
+            href="https://calibration-faucet.filswan.com/#/dashboard"
+            target="_blank"
+            color="primary"
+            css={{ margin: "0 auto", fontSize: "1.6rem" }}
+          >
+            Get test USDC
+          </Link>
+          <Link
+            block
+            href="https://chainlist.org/chain/80001"
+            target="_blank"
+            color="secondary"
+            css={{
+              margin: "10px auto",
+              fontSize: "1.4rem",
+              textAlign: "center",
+            }}
+          >
+            Add Mumbai testnet
             <br />
-            <b>Lo</b> starts at <b>$1</b>
-            <br />
-            <b>Hi</b> starts at <b>$100</b>
-          </Text>
-          <Text size="1.5rem">
-            If there are two buys of a single token
-            <br />
-            <b>Lo</b> increases by <b>$1 // Hi</b> decreases by <b>$1</b>
-          </Text>
-          <br />
-          <Text size="1.5rem">
-            Sell back a <b>Lo</b> to get a profit after the price has increased
-            <br />
-            Sell back a <b>Hi</b> to get a free <b>Lo</b> token
-          </Text>
-          <br />
-          <Text size="1.5rem">
-            When the prices converge—a <b>Hi</b> and <b>Lo</b> are both sold for
-            the same price—<b>the game is over</b>
-            <br />
-            The two winners who sold split the jackpot of <b>$100,000</b>
-            <br />
-          </Text>
-          <br />
+            to your wallet
+          </Link>
+          <Spacer y={1} />
+          <Grid.Container justify="center">
+            <Grid xs={0} sm={3}></Grid>
+            <Grid xs={12} sm={6} css={{ justifyContent: "center" }}>
+              <Text size="1.5rem" css={{ textAlign: "center" }}>
+                Buy a <b>Hi</b> or <b>Lo</b> token (with USDC)
+                <br />
+                <b>Lo</b> starts at <b>$1</b>
+                {" // "}
+                <b>Hi</b> starts at <b>$50</b>
+                <br />
+                The jackpot is <b>$500</b>
+              </Text>
+            </Grid>
+            <Grid xs={0} sm={3}></Grid>
+            <Grid xs={12}>
+              <Spacer y={1} />
+            </Grid>
+            <Grid xs={0} sm={3}></Grid>
+            <Grid xs={12} sm={6}>
+              <Text size="1.5rem">
+                <b>Lo</b> increases by <b>$1 // Hi</b> decreases by <b>$1</b>{" "}
+                when either:
+                <br />
+                - At least two players buy a token at the same price and one of
+                them sells the token; or
+                <br />- At least four players buy a token at the same price.
+                <br />
+                Before players can sell a token, two must buy at the same price.
+                <br />
+                Players can enter a queue that will automatically sell for them
+                when possible.
+                <br />
+                <br />
+                If a player holds a <b>Hi</b> token, when they sell it they will
+                receive a free <b>Lo</b> token.
+                <br />
+                <br />
+                Players can thus earn profit from selling their tokens, based on
+                the deterministic changes to their prices.
+                <br />
+                When the prices converge—a <b>Hi</b> or <b>Lo</b> is sold when
+                the tokens are at the same price—<b>the game is over</b>.
+                <br />
+                Whichever player made the sale wins the jackpot.
+                <br />
+              </Text>
+            </Grid>
+            <Grid xs={0} sm={3}></Grid>
+          </Grid.Container>
           <Text size="1.5rem" css={{ textAlign: "center" }}>
             Good luck!
           </Text>
