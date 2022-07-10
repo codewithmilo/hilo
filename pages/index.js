@@ -387,8 +387,16 @@ export default function Home() {
       window.location.reload();
     };
 
+    const handleDisconnect = () => {
+      (async function () {
+        await web3Modal.clearCachedProvider();
+      })();
+      window.location.reload();
+    };
+
     wallet.on("accountsChanged", handleAccountsChanged);
     wallet.on("chainChanged", handleChainChanged);
+    wallet.on("disconnect", handleDisconnect);
 
     return () => {
       if (wallet.removeListener) {
@@ -426,6 +434,10 @@ export default function Home() {
         <Text h1 size="8rem" className={styles.title}>
           HiLo
         </Text>
+        <Text className={styles.howTo} onClick={() => setHowToVisible(true)}>
+          How to play
+        </Text>
+        {HowToPlayModal(howToVisible, setHowToVisible)}
 
         {/* If wallet isn't connected, show the button. Otherwise show the game */}
         {(!wallet || !registered) && (
@@ -470,6 +482,7 @@ export default function Home() {
                 {playerTotals !== null && renderPlayerTotals(playerTotals)}
                 <Spacer y={1} />
                 {(hasHi || hasLo) && renderHoldings(hasHi)}
+                <Spacer y={1} />
 
                 {/* If we get a price updated event, show the banner at the top */}
                 {priceUpdatedEvent !== null &&
@@ -568,35 +581,6 @@ export default function Home() {
             )}
           </>
         )}
-
-        <Spacer y={6} />
-
-        <Grid.Container gap={3} justify="space-evenly">
-          <Grid>
-            <Link
-              block
-              icon
-              href="https://twitter.com/molocw"
-              target="_blank"
-              rel="noopener noreferrer"
-              css={{ fontSize: "1.2rem" }}
-            >
-              Twitter
-            </Link>
-          </Grid>
-          <Grid>
-            <Link
-              block
-              color="text"
-              href={null}
-              className={styles.howTo}
-              onClick={() => setHowToVisible(true)}
-            >
-              How to play
-            </Link>
-            {HowToPlayModal(howToVisible, setHowToVisible)}
-          </Grid>
-        </Grid.Container>
       </Container>
     </>
   );
