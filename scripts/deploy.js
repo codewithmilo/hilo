@@ -1,10 +1,10 @@
 const hre = require("hardhat");
 
 async function main() {
-  const hiPrice = 5;
+  const hiPrice = 50;
   const loPrice = 1;
   const buyCount = 2;
-  const jackpot = 5;
+  const jackpot = 500;
 
   // We get the contract to deploy
   const HILO = await hre.ethers.getContractFactory("HILO");
