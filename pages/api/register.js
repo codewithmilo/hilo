@@ -15,6 +15,15 @@ export default async function handler(req, res) {
     process.env.ALCHEMY_KEY
   );
   const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+  console.log(
+    "================================ signer ================================",
+    signer
+  );
+  console.log(
+    "============= keys ========================",
+    process.env.PRIVATE_KEY,
+    process.env.ALCHEMY_KEY
+  );
 
   // get the contract
   const contract = new ethers.Contract(
@@ -34,7 +43,7 @@ export default async function handler(req, res) {
 
     console.log("====================== TXN ===========================");
     const txn = await contract.registerPlayer(body.account, {
-      gasLimit: 100000,
+      gasLimit: 500000,
     });
     console.log(txn);
     receipt = await txn.wait();
