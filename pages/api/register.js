@@ -35,12 +35,6 @@ export default async function handler(req, res) {
   // register the user
   let receipt;
   try {
-    // console.log("====================== TXN ===========================");
-    // const txn = await contract.addToQueue(1);
-    // console.log(txn);
-    // receipt = await txn.wait();
-    // console.log(receipt);
-
     console.log("====================== TXN ===========================");
     const txn = await contract.registerPlayer(body.account, {
       gasLimit: 500000,
