@@ -63,7 +63,7 @@ export default function Home() {
   const [provider, setProvider] = useState(null);
   const [account, setAccount] = useState(null);
 
-  const [registered, setRegistered] = useState(true);
+  const [registered, setRegistered] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
 
   const [gameReady, setGameReady] = useState(false);
@@ -364,11 +364,11 @@ export default function Home() {
     if (!wallet) return;
 
     // set the registration status
-    // HILO.checkPlayerRegistered(provider, account).then((res) => {
-    //   // not registered, show the button
-    //   if (!res) setPageLoaded(true);
-    //   setRegistered(res);
-    // });
+    HILO.checkPlayerRegistered(provider, account).then((res) => {
+      // not registered, show the button
+      if (!res) setPageLoaded(true);
+      setRegistered(res);
+    });
 
     // HANDLE WALLET CHANGES
     const handleAccountsChanged = (accounts) => {
@@ -407,20 +407,20 @@ export default function Home() {
   }, [wallet, account, provider]);
 
   // When we are registered, set up the game
-  // useEffect(() => {
-  //   if (!wallet || !registered) return;
+  useEffect(() => {
+    if (!wallet || !registered) return;
 
-  //   updateGameState()
-  //     .then(
-  //       HILO.setupGameEvents(provider, account, updateGameState, () => {
-  //         clearBanners();
-  //         setPriceUpdatedEvent(true);
-  //       })
-  //     )
-  //     .then(() => setPageLoaded(true));
+    updateGameState()
+      .then(
+        HILO.setupGameEvents(provider, account, updateGameState, () => {
+          clearBanners();
+          setPriceUpdatedEvent(true);
+        })
+      )
+      .then(() => setPageLoaded(true));
 
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [registered]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registered]);
 
   if (!pageLoaded) return null;
 
