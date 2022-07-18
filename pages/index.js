@@ -312,7 +312,7 @@ export default function Home() {
       setErrorAndClearLoading
     );
     console.log("winners", gameWinners);
-    if (gameWinners.length) {
+    if (gameWinners && gameWinners.length) {
       setGameOver(true);
       setWinners(gameWinners);
     }
