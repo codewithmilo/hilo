@@ -6,7 +6,7 @@ import Web3Modal from "web3modal";
 import WalletConnectProvider from "@walletconnect/web3-provider";
 import { providers, Contract, utils } from "ethers";
 
-import { Container, Text, Spacer, Grid, Card, Link } from "@nextui-org/react";
+import { Container, Text, Spacer, Grid, Link } from "@nextui-org/react";
 import { HowToPlayModal } from "../components/modals";
 import {
   renderPlayer,
@@ -167,7 +167,7 @@ export default function Home() {
     if (approved) return Promise.resolve();
 
     // otherwise we need to ask the user to approve the payment
-    await HILO.approvePayments(
+    return await HILO.approvePayments(
       amount,
       provider,
       setPendingApproveAmount,
@@ -194,7 +194,16 @@ export default function Home() {
           abi.abi,
           signer
         );
-        return HILOContract.buy(tokenId);
+
+        return HILOContract.buy(tokenId).catch((err) => {
+          if (
+            err.reason ==
+            "execution reverted: ERC20: transfer amount exceeds allowance"
+          ) {
+            // retry if the approval didn't catch
+            return buyHandler(tokenId);
+          }
+        });
       })
       .catch((err) => handleTxnError(err))
       .then((txn) => provider.waitForTransaction(txn.hash))
@@ -312,7 +321,7 @@ export default function Home() {
       setErrorAndClearLoading
     );
     console.log("winners", gameWinners);
-    if (gameWinners.length) {
+    if (gameWinners && gameWinners.length) {
       setGameOver(true);
       setWinners(gameWinners);
     }

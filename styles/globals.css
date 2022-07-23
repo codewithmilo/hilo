@@ -9,6 +9,12 @@
   src: url("/fonts/FogTwo/FogtwoNo5.otf") format("opentype");
 }
 
+@font-face {
+  font-family: "SpaceGrotesk";
+  src: url("/fonts/SpaceGrotesk/SpaceGrotesk-Light.otf") format("opentype");
+  font-weight: normal;
+}
+
 html,
 body {
   padding: 0;
@@ -31,6 +37,10 @@ body {
 
 p {
   font-family: "FogTwo", serif !important;
+}
+
+.modal p {
+  font-family: "SpaceGrotesk", sans-serif !important;
 }
 
 h1,
