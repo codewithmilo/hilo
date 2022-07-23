@@ -15,34 +15,34 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     uint256 public constant LO = 1;
 
     // the initial prices
-    uint256 private initialHi;
-    uint256 private initialLo;
+    uint256 public initialHi;
+    uint256 public initialLo;
 
     // the up-to-date prices
-    uint256 private hiPrice;
-    uint256 private loPrice;
+    uint256 public hiPrice;
+    uint256 public loPrice;
 
     // number of buys per price level
-    uint256 private buyRequiredCount;
+    uint256 public buyRequiredCount;
 
     // number of buys that push price changes (double buyRequiredCount)
-    uint256 private buyForceCount;
+    uint256 public buyForceCount;
 
     // number of buys until sales are open
     // keep as a mapping so its easier to update
     // 0 => HI, 1 => LO
-    mapping(uint256 => uint256) private buyCounts;
+    mapping(uint256 => uint256) public buyCounts;
 
     // same as above but for buyForceCount;
-    mapping(uint256 => uint256) private buyForceCounts;
+    mapping(uint256 => uint256) public buyForceCounts;
 
     // queue for sales
     struct saleQueueItem {
         address player;
         uint256 tokenId;
     }
-    saleQueueItem[] private saleQueue;
-    uint256 private saleQueueIndex = 0;
+    saleQueueItem[] public saleQueue;
+    uint256 public saleQueueIndex = 0;
 
     struct Action {
         address player;
@@ -51,7 +51,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     }
 
     // store transactions by price so we can pull it when they converge
-    mapping(uint256 => Action[]) private actions;
+    mapping(uint256 => Action[]) public actions;
 
     // the list of players. they must be "registered" to play, to try to block bots
     // mapping(address => bool) public players;
@@ -255,7 +255,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         if (buyCounts[tokenId] == buyRequiredCount) sellFromQueue();
     }
 
-    function checkInQueue() public view returns (uint256) {
+    function checkInQueue(uint256 tokenId) public view returns (uint256) {
         // make sure they are registered
         // require(players[msg.sender], "Unregistered player");
 
@@ -267,7 +267,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
             if (saleQueue[i].player == msg.sender) {
                 return position;
             }
-            position += 1;
+            if (saleQueue[i].tokenId == tokenId) position += 1;
         }
         return 0;
     }
@@ -277,7 +277,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         // require(players[msg.sender], "Unregistered player");
 
         // check we aren't already in it
-        uint256 position = checkInQueue();
+        uint256 position = checkInQueue(tokenId);
         if (position > 0) return position;
 
         // add to queue

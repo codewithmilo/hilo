@@ -12,6 +12,9 @@ const renderConnectButton = (wallet, connectWallet) => {
         css={{
           maxWidth: "200px",
           margin: "0 auto",
+          "& span": {
+            zIndex: "auto !important",
+          },
         }}
         onPress={connectWallet}
       >

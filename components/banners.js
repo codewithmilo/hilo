@@ -120,13 +120,15 @@ const renderPriceUpdatedBanner = (tokenId, setShowBanner) => {
 
 const renderSalesLockedBanner = (add, loading, success, inlineCount, close) => {
   let countStr;
+  const aheadCount = inlineCount - 1;
   if (success) {
-    if (inlineCount === 0) {
+    if (aheadCount === 0) {
       countStr = "As soon as selling unlocks, your token will be sold.";
     } else {
-      countStr = "There are " + inlineCount;
-      countStr +=
-        (inlineCount === 1 ? " player" : " players") + " ahead of you.";
+      countStr =
+        aheadCount === 1
+          ? "There is 1 player ahead of you."
+          : "There are " + aheadCount + " players ahead of you.";
     }
   }
 
@@ -135,7 +137,7 @@ const renderSalesLockedBanner = (add, loading, success, inlineCount, close) => {
       <Card.Body>
         {success && (
           <Text b size="1.3rem" css={{ textAlign: "center" }}>
-            You have been added to the sale queue! {countStr}
+            You are in the queue! {countStr}
           </Text>
         )}
         {loading && (
