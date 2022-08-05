@@ -50,6 +50,15 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         uint256 price;
     }
 
+    struct GameState {
+        uint256 currentHi;
+        uint256 currentLo;
+        address[] winners;
+        uint256[2] playerTotals;
+        uint256[2] tokenBalances;
+        uint256 approvedSpend;
+    }
+
     // store transactions by price so we can pull it when they converge
     mapping(uint256 => Action[]) public actions;
 
@@ -117,6 +126,25 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     //     playerCount = playerCount + 1;
     //     emit PlayerRegistered(player);
     // }
+
+    function getGameState() public view returns (GameState memory) {
+        address player = msg.sender;
+        uint256 hiBalance = balanceOf(player, HI);
+        uint256 loBalance = balanceOf(player, LO);
+        uint256 approvedSpend = usdc.allowance(player, address(this));
+        uint256 hiTotal = totalSupply(HI);
+        uint256 loTotal = totalSupply(LO);
+
+        return
+            GameState(
+                hiPrice,
+                loPrice,
+                winners,
+                [hiTotal, loTotal],
+                [hiBalance, loBalance],
+                approvedSpend
+            );
+    }
 
     function getPrice(uint256 tokenId) public view returns (uint256) {
         if (tokenId == HI) {
@@ -209,12 +237,6 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
 
         // check if the token is valid
         require(tokenId == HI || tokenId == LO, "Invalid token.");
-
-        // check the player does not have any tokens already
-        require(
-            balanceOf(msg.sender, HI) == 0 && balanceOf(msg.sender, LO) == 0,
-            "HILO: cannot have more than one token"
-        );
 
         // get price
         uint256 price = getPrice(tokenId);
@@ -321,13 +343,6 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     function _sell(address player, uint256 tokenId) private whenNotPaused {
         // check if the token is valid
         require(tokenId == HI || tokenId == LO, "Invalid token.");
-
-        // check if the player has any tokens
-        require(
-            (tokenId == HI && balanceOf(player, HI) > 0) ||
-                (tokenId == LO && balanceOf(player, LO) > 0),
-            "HILO: cannot sell when you have no tokens"
-        );
 
         // check the lock is open
         bool isUnlocked = buyCounts[tokenId] == buyRequiredCount;
