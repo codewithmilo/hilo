@@ -4,16 +4,14 @@ import styles from "../styles/Home.module.css";
 
 import Web3Modal from "web3modal";
 import WalletConnectProvider from "@walletconnect/web3-provider";
-import { providers, Contract } from "ethers";
+import { providers } from "ethers";
 
 import { Container, Text, Spacer, Grid } from "@nextui-org/react";
 import { TokenCard } from "../components/buttons";
 
-import { GetErrorMsg, getWalletError, handleTxnError } from "../lib/errors";
+import { getWalletError } from "../lib/errors";
 import { CONSTANTS } from "../lib/constants";
-import * as HILO from "../lib/contract";
-
-import abi from "../src/HILO.json";
+import { getGameState, setupGameEvents } from "../lib/contract";
 
 let web3Modal;
 if (typeof window !== "undefined") {
@@ -86,145 +84,8 @@ export default function Home() {
       .catch((err) => setWalletError(getWalletError(err)));
   };
 
-  // Pre-approve the contract to spend the user's USDC
-  // Set at the highest possible amount in the game
-  const preApprovePayments = async () => {
-    await HILO.approvePayments(
-      CONSTANTS.MAX_APPROVAL_AMOUNT,
-      provider,
-      setPendingApproveAmount,
-      setErrorAndClearLoading
-    )
-      .then(() => {
-        setApproveButtonLoading(false);
-        setPaymentApproved(true);
-        setApprovalSuccess(true);
-      })
-      .catch((err) => setErrorAndClearLoading(err));
-  };
-
-  // returns nothing or the txn receipt
-  const checkApprovalAndPossiblyApprove = async (tokenId) => {
-    // add 5 if it's LO, in case the price updates while purchasing
-    const amount = tokenId === CONSTANTS.LO_TOKEN_ID ? loPrice + 5 : hiPrice;
-    const approved = await HILO.checkApproval(
-      provider,
-      setPaymentApproved,
-      amount
-    ).catch((err) => setErrorAndClearLoading(err));
-
-    // nothing to do if already approved
-    if (approved) return Promise.resolve();
-
-    // otherwise we need to ask the user to approve the payment
-    return await HILO.approvePayments(
-      amount,
-      provider,
-      setPendingApproveAmount,
-      setErrorAndClearLoading
-    );
-  };
-
-  // Buy a token
-  const buyHandler = async (tokenId) => {
-    const loadingFn =
-      tokenId == CONSTANTS.HI_TOKEN_ID ? setHiBuyLoading : setLoBuyLoading;
-    loadingFn(true);
-    clearBanners();
-
-    checkApprovalAndPossiblyApprove(tokenId)
-      .then(() => {
-        // unload then reload, so the loading animation lines up lol
-        loadingFn(false);
-        setPendingTokenBuy(tokenId);
-        loadingFn(true);
-        const signer = provider.getSigner();
-        const HILOContract = new Contract(
-          CONSTANTS.HILO_CONTRACT_ADDRESS,
-          abi.abi,
-          signer
-        );
-
-        return HILOContract.buy(tokenId).catch((err) => {
-          if (
-            err.reason ==
-            "execution reverted: ERC20: transfer amount exceeds allowance"
-          ) {
-            // retry if the approval didn't catch
-            return buyHandler(tokenId);
-          }
-        });
-      })
-      .catch((err) => handleTxnError(err))
-      .then((txn) => provider.waitForTransaction(txn.hash))
-      .then((receipt) => {
-        console.log("Bought tokenID %s", tokenId);
-        console.log(receipt);
-
-        setBuySuccess(true);
-        tokenId == CONSTANTS.HI_TOKEN_ID
-          ? setHiBuyLoading(false)
-          : setLoBuyLoading(false);
-
-        updateGameState();
-      })
-      .catch((err) => setErrorAndClearLoading(err));
-  };
-
-  // Sell a token
-  const sellHandler = async (tokenId) => {
-    tokenId == CONSTANTS.HI_TOKEN_ID
-      ? setHiSellLoading(true)
-      : setLoSellLoading(true);
-    clearBanners();
-
-    setPendingTokenSell(tokenId);
-    const signer = provider.getSigner();
-    const HILOContract = new Contract(
-      CONSTANTS.HILO_CONTRACT_ADDRESS,
-      abi.abi,
-      signer
-    );
-
-    await HILOContract.sell(tokenId)
-      .then((txn) => provider.waitForTransaction(txn.hash))
-      .then((receipt) => {
-        console.log("Sold tokenID %s", tokenId);
-        console.log(receipt);
-
-        setSellSuccess(true);
-        tokenId == CONSTANTS.HI_TOKEN_ID
-          ? setHiSellLoading(false)
-          : setLoSellLoading(false);
-        updateGameState();
-      })
-      .catch((err) => setErrorAndClearLoading(err));
-  };
-
-  const addToQueue = async (tokenId) => {
-    console.log("Adding to queue...");
-    setSalesLockedPending(true);
-    const inline = await HILO.addToQueue(
-      provider,
-      tokenId,
-      setErrorAndClearLoading
-    );
-    console.log("Added, inline:", inline);
-    setSalesQueueIndex(inline);
-    setSalesLockedSuccess(true);
-    setSalesLockedPending(false);
-    setHiSellLoading(false);
-    setLoSellLoading(false);
-  };
-
-  const setErrorAndClearLoading = (error) => {
-    console.log(error);
-    const errorMsg = GetErrorMsg(error);
-    setError(errorMsg);
-  };
-
   const updateGameState = async () => {
-    HILO.getGameState(provider)
+    getGameState(provider)
       .then((res) => setGameState(res.result))
       .then(setPageState(PageState.READY));
   };
@@ -286,12 +147,7 @@ export default function Home() {
 
     updateGameState()
       .then(
-        HILO.setupGameEvents(
-          provider,
-          account,
-          updateGameState,
-          setPriceUpdated
-        )
+        setupGameEvents(provider, account, updateGameState, setPriceUpdated)
       )
       .then(() => {
         if (gameState.winners.length > 0) {
@@ -318,11 +174,16 @@ export default function Home() {
         </Text>
         <Text
           className={styles.howTo}
-          onClick={() => setModalVisible(Modals.HowToPlay)}
+          onClick={() => setModalVisible(Modals.HOW_TO_PLAY)}
         >
           How to play
         </Text>
-        <HiloModal visible={modalVisible} setVisible={setModalVisible} />
+
+        <HiloModal
+          type={modalVisible}
+          close={() => setModalVisible(false)}
+          provider={provider}
+        />
 
         {/* NO WALLET */}
         {pageState === PageState.NO_WALLET && (
@@ -388,8 +249,7 @@ export default function Home() {
             <Spacer y={1} />
             <ApproveButton
               gameState={gameState}
-              open={() => setModalVisible(Modals.APPROVE)}
-              close={() => setModalVisible(false)}
+              onClick={() => setModalVisible(Modals.APPROVE)}
             />
           </>
         )}
