@@ -1,38 +1,42 @@
-import { Contract, utils } from "ethers";
+import { BigNumber, Contract, providers, utils } from "ethers";
 import abi from "../src/HILO.json";
 import { CONSTANTS } from "./constants";
 import { handleTxnError } from "./errors";
+import { GameState } from "./types";
 
-const checkPlayerRegistered = async (provider, account) => {
-  return true;
-  // const HILOContract = new Contract(
-  //   CONSTANTS.HILO_CONTRACT_ADDRESS,
-  //   abi.abi,
-  //   provider
-  // );
-
-  // return HILOContract.players(account)
-  //   .then((registered) => {
-  //     if (registered) return true;
-  //     return false;
-  //   })
-  //   .catch((err) => {
-  //     console.log(err);
-  //     return false;
-  //   });
+type HiloGameState = {
+  currentHi: BigNumber;
+  currentLo: BigNumber;
+  winners: string[];
+  playerTotals: BigNumber[];
+  tokenBalances: BigNumber[];
+  approvedSpend: BigNumber;
 };
 
-const getGameState = async (provider) => {
+const getGameState = async (
+  provider: providers.Web3Provider,
+  address: string
+): Promise<GameState> => {
   const HILOContract = new Contract(
     CONSTANTS.HILO_CONTRACT_ADDRESS,
     abi.abi,
     provider
   );
 
-  return HILOContract.getGameState().then((state) => {
-    console.log("Game state:", state);
-    return state;
-  });
+  const mapToGameState = (state: HiloGameState): GameState => {
+    return {
+      currentHi: state.currentHi.toNumber(),
+      currentLo: state.currentLo.toNumber(),
+      winners: state.winners,
+      playerTotals: state.playerTotals.map((total) => total.toNumber()),
+      tokenBalances: state.tokenBalances.map((balance) => balance.toNumber()),
+      approvedSpend: state.approvedSpend.toNumber(),
+    };
+  };
+
+  return HILOContract.getGameState(address).then((state: HiloGameState) =>
+    mapToGameState(state)
+  );
 };
 
 const getPrice = async (tokenId, provider, handleErrors) => {
@@ -76,7 +80,11 @@ const getPlayerTotals = async (provider) => {
     abi.abi,
     provider
   );
-  let total = {};
+  let total = {
+    hi: null,
+    lo: null,
+    registered: null,
+  };
   // const registeredTotal = await HILOContract.playerCount();
   // total.registered = registeredTotal.toNumber();
 
@@ -234,7 +242,6 @@ const setupGameEvents = (provider, account, updateFn, bannerUpdate) => {
 };
 
 export {
-  checkPlayerRegistered,
   getGameState,
   getPrice,
   getBalance,

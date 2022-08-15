@@ -16,10 +16,11 @@ export default class TokenCard extends Component<TokenCardProps> {
 
   render() {
     const { tokenType, price, buyFn, sellFn } = this.props;
+    const tokenStr = tokenType === Tokens.HI ? "Hi" : "Lo";
     return (
       <Card variant="bordered">
         <Card.Body css={{ textAlign: "center !important" }}>
-          <Text h1>{tokenType}</Text>
+          <Text h1>{tokenStr}</Text>
           <Text h2>${price}</Text>
         </Card.Body>
         <Card.Divider />

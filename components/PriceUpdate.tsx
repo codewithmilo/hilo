@@ -1,6 +1,6 @@
 import { Card, Text } from "@nextui-org/react";
 import { Component } from "react";
-import CONSTANTS from "../lib/constants";
+import { CONSTANTS } from "../lib/constants";
 import { PriceUpdateProps } from "../lib/types";
 
 export default class PriceUpdate extends Component<PriceUpdateProps> {
@@ -9,6 +9,8 @@ export default class PriceUpdate extends Component<PriceUpdateProps> {
   }
 
   render() {
+    if (this.props.token === null) return null;
+
     const tokenStr = this.props.token === CONSTANTS.HI_TOKEN_ID ? "Hi" : "Lo";
     const changeStr =
       this.props.token === CONSTANTS.HI_TOKEN_ID ? "decreased" : "increased";

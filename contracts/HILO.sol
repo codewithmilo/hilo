@@ -127,8 +127,11 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     //     emit PlayerRegistered(player);
     // }
 
-    function getGameState() public view returns (GameState memory) {
-        address player = msg.sender;
+    function getGameState(address player)
+        public
+        view
+        returns (GameState memory)
+    {
         uint256 hiBalance = balanceOf(player, HI);
         uint256 loBalance = balanceOf(player, LO);
         uint256 approvedSpend = usdc.allowance(player, address(this));

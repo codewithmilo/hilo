@@ -22,6 +22,8 @@ export class Balances extends Component<{ balances: number[] }> {
     const hiBalance = balances[0];
     const loBalance = balances[1];
 
+    if (hiBalance === 0 && loBalance === 0) return null;
+
     const balanceStr = (balance: number, tokenType: Tokens) => {
       const token = tokenType === Tokens.HI ? "Hi" : "Lo";
       if (balance === 0) return `no ${token} tokens`;
@@ -30,19 +32,30 @@ export class Balances extends Component<{ balances: number[] }> {
     };
 
     return (
-      <Card
-        variant="bordered"
-        css={{ maxWidth: "200px", margin: "0 auto", padding: "10px" }}
-      >
-        <Text h5 css={{ textAlign: "center" }}>
-          You have {balanceStr(hiBalance, Tokens.HI)}
-        </Text>
-        <Image alt="Hi token" height={40} src="/img/hiToken.png" />
-        <Text h5 css={{ textAlign: "center" }}>
-          You have {balanceStr(loBalance, Tokens.LO)}
-        </Text>
-        <Image alt="Lo token" height={40} src="/img/loToken.png" />
-      </Card>
+      <Grid.Container gap={1} justify="center">
+        <Grid xs={6} justify="flex-end">
+          <Card
+            variant="bordered"
+            css={{
+              maxWidth: "200px",
+              padding: "10px",
+            }}
+          >
+            <Text h5 css={{ textAlign: "center" }}>
+              You have {balanceStr(hiBalance, Tokens.HI)}
+            </Text>
+            <Image alt="Hi token" height={40} src="/img/hiToken.png" />
+          </Card>
+        </Grid>
+        <Grid xs={6}>
+          <Card variant="bordered" css={{ maxWidth: "200px", padding: "10px" }}>
+            <Text h5 css={{ textAlign: "center" }}>
+              You have {balanceStr(loBalance, Tokens.LO)}
+            </Text>
+            <Image alt="Lo token" height={40} src="/img/loToken.png" />
+          </Card>
+        </Grid>
+      </Grid.Container>
     );
   }
 }
@@ -84,6 +97,7 @@ export class PlayerTotals extends Component<{ totals: number[] }> {
 
   render() {
     const { totals } = this.props;
+    if (totals[0] === 0 && totals[1] === 0) return null;
     return (
       <Card variant="bordered" css={{ maxWidth: "150px", margin: "0 auto" }}>
         <Text h5 css={{ textAlign: "center" }}>

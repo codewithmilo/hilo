@@ -116,17 +116,15 @@ export default function Home() {
   useEffect(() => {
     if (!wallet) return;
 
-    updateGameState()
-      .then(() =>
-        setupGameEvents(provider, account, updateGameState, setPriceUpdated)
-      )
-      .then(() => {
-        if (gameState.winners.length > 0) {
-          setPageState(PageState.OVER);
-        } else {
-          setPageState(PageState.READY);
-        }
-      });
+    updateGameState().then((state: GameState) => {
+      setupGameEvents(provider, account, updateGameState, setPriceUpdated);
+      console.log(state);
+      if (state.winners.length > 0) {
+        setPageState(PageState.OVER);
+      } else {
+        setPageState(PageState.READY);
+      }
+    });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallet]);
@@ -145,26 +143,24 @@ export default function Home() {
         const accounts = await library.listAccounts();
         const network = await library.getNetwork();
 
-        setWallet(instance);
-        if (accounts) setAccount(accounts[0]);
-
         // // make sure we're on polygon
         if (network.chainId !== CONSTANTS.CHAIN_ID) {
           web3Modal.clearCachedProvider();
           throw new Error("bad_chain");
         }
 
-        // otherwise it ok
+        setWallet(instance);
         setProvider(library);
-        setPageState(PageState.READY);
+        if (accounts) setAccount(accounts[0]);
       })
       .catch((err) => setWalletError(getWalletError(err)));
   };
 
   const updateGameState = async () => {
-    getGameState(provider)
-      .then((res) => setGameState(res.result))
-      .then(() => setPageState(PageState.READY));
+    const state = await getGameState(provider, account);
+    setGameState(state);
+    setPageState(PageState.READY);
+    return state;
   };
 
   ////////////////////////////////////////////////////////////////////////////////
