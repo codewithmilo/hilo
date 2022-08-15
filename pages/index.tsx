@@ -6,14 +6,28 @@ import Web3Modal from "web3modal";
 import WalletConnectProvider from "@walletconnect/web3-provider";
 import { providers } from "ethers";
 
+import { GameState, PageState, Modals, Tokens } from "../lib/types";
+
+import HiloModal from "../components/HiloModal";
+import ErrorBanner from "../components/ErrorBanner";
+import ConnectButton from "../components/buttons/ConnectButton";
+import ApproveButton from "../components/buttons/ApproveButton";
+import PriceUpdate from "../components/PriceUpdate";
+import TokenCard from "../components/TokenCard";
+import {
+  Balances,
+  Player,
+  PlayerTotals,
+  Winners,
+} from "../components/playerInfo";
+
 import { Container, Text, Spacer, Grid } from "@nextui-org/react";
-import { TokenCard } from "../components/buttons";
 
 import { getWalletError } from "../lib/errors";
 import { CONSTANTS } from "../lib/constants";
 import { getGameState, setupGameEvents } from "../lib/contract";
 
-let web3Modal;
+let web3Modal: Web3Modal;
 if (typeof window !== "undefined") {
   web3Modal = new Web3Modal({
     network: CONSTANTS.CHAIN_NAME,
@@ -33,37 +47,100 @@ if (typeof window !== "undefined") {
   });
 }
 
-const Modals = {
-  HOW_TO_PLAY: 0,
-  APPROVE: 1,
-  BUY: 2,
-  SELL: 3,
-};
-
-const PageState = {
-  UNLOADED: 0,
-  NO_WALLET: 1,
-  READY: 2,
-  OVER: 3,
-};
-
 export default function Home() {
-  const [pageState, setPageState] = useState(PageState.UNLOADED);
+  const [pageState, setPageState] = useState<PageState>(PageState.UNLOADED);
 
   // the wallet provider
-  const [wallet, setWallet] = useState(null);
-  const [provider, setProvider] = useState(null);
-  const [account, setAccount] = useState(null);
+  const [wallet, setWallet] = useState<any | null>(null);
+  const [provider, setProvider] = useState<providers.Web3Provider | null>(null);
+  const [account, setAccount] = useState<string | null>(null);
 
-  const [gameState, setGameState] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false); // Modal type
-  const [walletError, setWalletError] = useState(null);
-  const [priceUpdated, setPriceUpdated] = useState(null); // this is which token was updated, so HI or LO
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [modalVisible, setModalVisible] = useState<Modals | null>(null);
+  const [walletError, setWalletError] = useState<string>(null);
+  const [priceUpdated, setPriceUpdated] = useState<Tokens>(null);
+
+  ////////////////////////////////////////////////////////////////////////////////
+  //                                                                            //
+  //      PAGE LOAD: CONNECT WALLET / SETUP GAME / CREATE EVENT LISTENERS       //
+  //                                                                            //
+  ////////////////////////////////////////////////////////////////////////////////
+
+  useEffect(() => {
+    if (web3Modal.cachedProvider) {
+      connectWallet();
+    } else {
+      // we can show the page, there's no wallet
+      setPageState(PageState.NO_WALLET);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When we have a wallet, setup wallet events
+  useEffect(() => {
+    if (!wallet) return;
+
+    // HANDLE WALLET CHANGES
+    const handleAccountsChanged = (accounts: string[]) => {
+      console.log("accountsChanged", accounts);
+      if (!accounts.length) {
+        // this is effectively a disconnect
+        web3Modal.clearCachedProvider();
+      }
+      window.location.reload();
+    };
+    const handleChainChanged = (chainId: number) => {
+      console.log("chainChanged", chainId);
+      // ethers said to just do this. fair!
+      window.location.reload();
+    };
+
+    const handleDisconnect = () => {
+      web3Modal.clearCachedProvider();
+      window.location.reload();
+    };
+
+    wallet.on("accountsChanged", handleAccountsChanged);
+    wallet.on("chainChanged", handleChainChanged);
+    wallet.on("disconnect", handleDisconnect);
+
+    return () => {
+      if (wallet.removeListener) {
+        wallet.removeListener("accountsChanged", handleAccountsChanged);
+        wallet.removeListener("chainChanged", handleChainChanged);
+      }
+    };
+  }, [wallet, account, provider]);
+
+  // When we have a wallet connected, set up the game
+  useEffect(() => {
+    if (!wallet) return;
+
+    updateGameState()
+      .then(() =>
+        setupGameEvents(provider, account, updateGameState, setPriceUpdated)
+      )
+      .then(() => {
+        if (gameState.winners.length > 0) {
+          setPageState(PageState.OVER);
+        } else {
+          setPageState(PageState.READY);
+        }
+      });
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallet]);
+
+  ////////////////////////////////////////////////////////////////////////////////
+  //                                                                            //
+  //                          APPLICATION METHODS!                              //
+  //                                                                            //
+  ////////////////////////////////////////////////////////////////////////////////
 
   const connectWallet = async () => {
     await web3Modal
       .connect()
-      .then(async (instance) => {
+      .then(async (instance: any) => {
         const library = new providers.Web3Provider(instance);
         const accounts = await library.listAccounts();
         const network = await library.getNetwork();
@@ -87,81 +164,16 @@ export default function Home() {
   const updateGameState = async () => {
     getGameState(provider)
       .then((res) => setGameState(res.result))
-      .then(setPageState(PageState.READY));
+      .then(() => setPageState(PageState.READY));
   };
 
-  // When the page loads: try to connect wallet (or show connect button)
-  useEffect(() => {
-    if (web3Modal.cachedProvider) {
-      connectWallet();
-    } else {
-      // we can show the page, there's no wallet
-      setPageState(PageState.NO_WALLET);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // When we have a wallet, setup wallet events
-  useEffect(() => {
-    if (!wallet) return;
-
-    // HANDLE WALLET CHANGES
-    const handleAccountsChanged = (accounts) => {
-      console.log("accountsChanged", accounts);
-      if (!accounts.length) {
-        // this is effectively a disconnect
-        (async function () {
-          await web3Modal.clearCachedProvider();
-        })();
-      }
-      window.location.reload();
-    };
-    const handleChainChanged = (chainId) => {
-      console.log("chainChanged", chainId);
-      // ethers said to just do this. fair!
-      window.location.reload();
-    };
-
-    const handleDisconnect = () => {
-      (async function () {
-        await web3Modal.clearCachedProvider();
-      })();
-      window.location.reload();
-    };
-
-    wallet.on("accountsChanged", handleAccountsChanged);
-    wallet.on("chainChanged", handleChainChanged);
-    wallet.on("disconnect", handleDisconnect);
-
-    return () => {
-      if (wallet.removeListener) {
-        wallet.removeListener("accountsChanged", handleAccountsChanged);
-        wallet.removeListener("chainChanged", handleChainChanged);
-      }
-    };
-  }, [wallet, account, provider]);
-
-  // When we have a wallet connected, set up the game
-  useEffect(() => {
-    if (!wallet) return;
-
-    updateGameState()
-      .then(
-        setupGameEvents(provider, account, updateGameState, setPriceUpdated)
-      )
-      .then(() => {
-        if (gameState.winners.length > 0) {
-          setPageState(PageState.OVER);
-        } else {
-          setPageState(PageState.READY);
-        }
-      });
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallet]);
+  ////////////////////////////////////////////////////////////////////////////////
+  //                                                                            //
+  //                            PAGE RENDERING!                                 //
+  //                                                                            //
+  ////////////////////////////////////////////////////////////////////////////////
 
   if (pageState === PageState.UNLOADED) return null;
-
   return (
     <>
       <Head>
@@ -180,8 +192,9 @@ export default function Home() {
         </Text>
 
         <HiloModal
-          type={modalVisible}
-          close={() => setModalVisible(false)}
+          show={modalVisible === Modals.HOW_TO_PLAY}
+          modalType={modalVisible}
+          closeFn={() => setModalVisible(null)}
           provider={provider}
         />
 
@@ -191,9 +204,9 @@ export default function Home() {
             <Text size="3rem" className={styles.subtitle}>
               A Game of Tokens
             </Text>
-            <WalletError error={walletError} />
+            <ErrorBanner error={walletError} closeFn={null} />
             <Spacer y={10} />
-            <ConnectButton wallet={wallet} connectWallet={connectWallet} />
+            <ConnectButton connectFn={connectWallet} />
           </>
         )}
 
@@ -214,7 +227,7 @@ export default function Home() {
         {pageState === PageState.READY && (
           <>
             {/* Show the player */}
-            <Player account={account} />
+            <Player player={account} />
             <Spacer y={1} />
             <PlayerTotals totals={gameState.playerTotals} />
             <Spacer y={1} />
@@ -222,34 +235,46 @@ export default function Home() {
             <Spacer y={1} />
 
             {/* If we get a price updated event, show the banner at the top */}
-            <PriceUpdatedBanner
-              updatedToken={priceUpdated}
-              close={() => setPriceUpdated(null)}
+            <PriceUpdate
+              token={priceUpdated}
+              closeFn={() => setPriceUpdated(null)}
             />
 
             {/* Show the two tokens */}
             <Grid.Container gap={1} justify="center">
               <Grid xs={6} sm={6} md={4}>
                 <TokenCard
-                  type={CONSTANTS.HI_TOKEN_NAME}
-                  tokenId={CONSTANTS.HI_TOKEN_ID}
-                  gameState={gameState}
+                  tokenType={Tokens.HI}
+                  price={gameState.currentHi}
+                  buyFn={() => setModalVisible(Modals.BUY)}
+                  sellFn={() => setModalVisible(Modals.SELL)}
                 />
               </Grid>
               <Grid xs={6} sm={6} md={4}>
                 <TokenCard
-                  type={CONSTANTS.LO_TOKEN_NAME}
-                  tokenId={CONSTANTS.LO_TOKEN_ID}
-                  gameState={gameState}
+                  tokenType={Tokens.LO}
+                  price={gameState.currentLo}
+                  buyFn={() => setModalVisible(Modals.BUY)}
+                  sellFn={() => setModalVisible(Modals.SELL)}
                 />
               </Grid>
+              <HiloModal
+                show={modalVisible === Modals.BUY}
+                modalType={modalVisible}
+                closeFn={() => setModalVisible(null)}
+              />
             </Grid.Container>
 
             {/* If payment is not approved, show the button */}
             <Spacer y={1} />
             <ApproveButton
               gameState={gameState}
-              onClick={() => setModalVisible(Modals.APPROVE)}
+              clickFn={() => setModalVisible(Modals.APPROVE)}
+            />
+            <HiloModal
+              show={modalVisible === Modals.APPROVE}
+              modalType={modalVisible}
+              closeFn={() => setModalVisible(null)}
             />
           </>
         )}

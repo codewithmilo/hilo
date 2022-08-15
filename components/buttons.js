@@ -1,29 +1,6 @@
 import { Button, Loading, Spacer, Card, Text } from "@nextui-org/react";
 import { ConfirmApproveModal } from "./modals";
 
-const renderConnectButton = (wallet, connectWallet) => {
-  if (wallet) {
-    return null;
-  } else {
-    return (
-      <Button
-        color="gradient"
-        size="xl"
-        css={{
-          maxWidth: "200px",
-          margin: "0 auto",
-          "& span": {
-            zIndex: "auto !important",
-          },
-        }}
-        onPress={connectWallet}
-      >
-        Connect wallet to play
-      </Button>
-    );
-  }
-};
-
 const renderRegisterButton = (account, setRegistered, loading, setLoading) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
