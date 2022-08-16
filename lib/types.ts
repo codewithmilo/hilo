@@ -1,19 +1,20 @@
-export type ErrorBannerProps = {
-  error: string;
-  closeFn: () => void | null;
-};
+import { providers } from "ethers";
 
-export type ConnectButtonProps = { connectFn: () => void };
+export type SolidityTxn = providers.TransactionResponse;
+export type SolidityTxnReceipt = providers.TransactionReceipt;
 
-export type WinnersProps = {
-  player: string;
-  winners: string[];
-};
+export function isSolidityTxnReceipt(
+  receipt: any
+): receipt is SolidityTxnReceipt {
+  return receipt.status !== undefined;
+}
 
-export type PriceUpdateProps = {
-  token: Tokens;
-  closeFn: () => void;
-};
+export type SolidityError = any;
+export type SolidityErrorHandler = (error: SolidityError) => void;
+
+export function isSolidityError(error: any): error is SolidityError {
+  return error.code !== undefined;
+}
 
 export type GameState = {
   currentHi: number;

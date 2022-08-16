@@ -1,28 +1,26 @@
 import { Card, Text } from "@nextui-org/react";
-import { Component } from "react";
 import { CONSTANTS } from "../lib/constants";
-import { PriceUpdateProps } from "../lib/types";
+import { Tokens } from "../lib/types";
 
-export default class PriceUpdate extends Component<PriceUpdateProps> {
-  constructor(props: PriceUpdateProps) {
-    super(props);
-  }
+type PriceUpdateProps = {
+  token: Tokens;
+  closeFn: () => void;
+};
 
-  render() {
-    if (this.props.token === null) return null;
+export default function PriceUpdate(props: PriceUpdateProps) {
+  if (props.token === null) return null;
+  const { token, closeFn } = props;
 
-    const tokenStr = this.props.token === CONSTANTS.HI_TOKEN_ID ? "Hi" : "Lo";
-    const changeStr =
-      this.props.token === CONSTANTS.HI_TOKEN_ID ? "decreased" : "increased";
+  const tokenStr = token === CONSTANTS.HI_TOKEN_ID ? "Hi" : "Lo";
+  const changeStr = token === CONSTANTS.HI_TOKEN_ID ? "decreased" : "increased";
 
-    return (
-      <Card variant="bordered" isPressable onPress={this.props.closeFn}>
-        <Card.Body>
-          <Text b color="white" size="1.2rem" css={{ textAlign: "center" }}>
-            The {tokenStr} token price has {changeStr}!
-          </Text>
-        </Card.Body>
-      </Card>
-    );
-  }
+  return (
+    <Card variant="bordered" isPressable onPress={closeFn}>
+      <Card.Body>
+        <Text b color="white" size="1.2rem" css={{ textAlign: "center" }}>
+          The {tokenStr} token price has {changeStr}!
+        </Text>
+      </Card.Body>
+    </Card>
+  );
 }

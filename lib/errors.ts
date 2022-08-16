@@ -1,3 +1,5 @@
+import { SolidityError, SolidityTxn } from "./types";
+
 const errorMap = {
   4001: "It looks like you rejected the transaction. Try again?",
   "execution reverted: ERC20: transfer amount exceeds allowance":
@@ -17,7 +19,8 @@ const walletErrorMap = {
   "User Rejected": "Request to connect rejected. Please try again.",
 };
 
-const GetErrorMsg = (error) => {
+const GetErrorMsg = (error: SolidityError): string => {
+  console.log(error);
   let errorMessage = null;
 
   // We have a metamask error: catch it
@@ -34,24 +37,10 @@ const GetErrorMsg = (error) => {
   return errorMessage;
 };
 
-const getWalletError = (error, setError) => {
-  const errDisplay = walletErrorMap[error.message];
+const getWalletError = (error) => {
+  let errDisplay = walletErrorMap[error.message];
   if (!errDisplay) errDisplay = "Something went wrong. Please try again.";
   return errDisplay;
 };
 
-const handleTxnError = (err) => {
-  console.log(err);
-  const errCode = err.code;
-  console.log(errCode);
-  console.log(err.replacement);
-
-  // if we changed the txn, send through the new one
-  if (errCode === "TRANSACTION_REPLACED") {
-    return err.replacement;
-  } else {
-    throw err;
-  }
-};
-
-export { GetErrorMsg, getWalletError, handleTxnError };
+export { GetErrorMsg, getWalletError };

@@ -1,8 +1,15 @@
 import { BigNumber, Contract, providers, utils } from "ethers";
+import { Dispatch, SetStateAction } from "react";
 import abi from "../src/HILO.json";
 import { CONSTANTS } from "./constants";
-import { handleTxnError } from "./errors";
-import { GameState } from "./types";
+import {
+  GameState,
+  SolidityError,
+  SolidityErrorHandler,
+  SolidityTxn,
+  SolidityTxnReceipt,
+  Tokens,
+} from "./types";
 
 type HiloGameState = {
   currentHi: BigNumber;
@@ -13,10 +20,24 @@ type HiloGameState = {
   approvedSpend: BigNumber;
 };
 
+const maybeHandleTxnReplaced = (err: SolidityError): SolidityTxn | void => {
+  console.log(err);
+  const errCode = err.code;
+  console.log(errCode);
+  console.log(err.replacement);
+
+  // if we changed the txn, send through the new one
+  if (errCode === "TRANSACTION_REPLACED") {
+    return err.replacement;
+  } else {
+    throw err;
+  }
+};
+
 const getGameState = async (
   provider: providers.Web3Provider,
   address: string
-): Promise<GameState> => {
+): Promise<GameState | SolidityError> => {
   const HILOContract = new Contract(
     CONSTANTS.HILO_CONTRACT_ADDRESS,
     abi.abi,
@@ -30,16 +51,19 @@ const getGameState = async (
       winners: state.winners,
       playerTotals: state.playerTotals.map((total) => total.toNumber()),
       tokenBalances: state.tokenBalances.map((balance) => balance.toNumber()),
-      approvedSpend: state.approvedSpend.toNumber(),
+      approvedSpend: Number(state.approvedSpend.toBigInt()) / 1e18,
     };
   };
 
-  return HILOContract.getGameState(address).then((state: HiloGameState) =>
-    mapToGameState(state)
-  );
+  return HILOContract.getGameState(address)
+    .then((state: HiloGameState) => mapToGameState(state))
+    .catch((err: SolidityError) => err);
 };
 
-const getPrice = async (tokenId, provider, handleErrors) => {
+const getPrice = async (
+  tokenId: Tokens,
+  provider: providers.Web3Provider
+): Promise<number | SolidityError> => {
   const HILOContract = new Contract(
     CONSTANTS.HILO_CONTRACT_ADDRESS,
     abi.abi,
@@ -47,15 +71,22 @@ const getPrice = async (tokenId, provider, handleErrors) => {
   );
 
   return HILOContract.getPrice(tokenId)
-    .then((_price) => {
+    .then((_price: BigNumber) => {
       const price = _price.toNumber();
       console.log("Got price for tokenID %s: %s", tokenId, price);
       return price;
     })
-    .catch((err) => handleErrors(err));
+    .catch((err: SolidityError) => {
+      console.log(err);
+      return err;
+    });
 };
 
-const getBalance = async (tokenId, provider, handleErrors) => {
+const getBalance = async (
+  tokenId: Tokens,
+  provider: providers.Web3Provider,
+  handleErrors: SolidityErrorHandler
+): Promise<number> => {
   const signer = provider.getSigner();
   const address = await signer.getAddress();
 
@@ -66,15 +97,15 @@ const getBalance = async (tokenId, provider, handleErrors) => {
   );
 
   return HILOContract.balanceOf(address, tokenId)
-    .then((_balance) => {
+    .then((_balance: BigNumber) => {
       const balance = _balance.toNumber();
       console.log("Got balance for tokenID %s: %s", tokenId, balance);
       return balance;
     })
-    .catch((err) => handleErrors(err));
+    .catch((err: SolidityError) => handleErrors(err));
 };
 
-const getPlayerTotals = async (provider) => {
+const getPlayerTotals = async (provider: providers.Web3Provider) => {
   const HILOContract = new Contract(
     CONSTANTS.HILO_CONTRACT_ADDRESS,
     abi.abi,
@@ -85,8 +116,6 @@ const getPlayerTotals = async (provider) => {
     lo: null,
     registered: null,
   };
-  // const registeredTotal = await HILOContract.playerCount();
-  // total.registered = registeredTotal.toNumber();
 
   return await HILOContract.totalSupply(CONSTANTS.HI_TOKEN_ID).then(
     (supply) => {
@@ -127,7 +156,11 @@ const getWinners = async (provider, handleErrors) => {
     .catch((err) => handleErrors(err));
 };
 
-const addToQueue = async (provider, tokenId, handleErrors) => {
+const addToQueue = async (
+  provider: providers.Web3Provider,
+  tokenId: Tokens,
+  handleErrors: SolidityErrorHandler
+): Promise<number> => {
   const signer = provider.getSigner();
   const HILOContract = new Contract(
     CONSTANTS.HILO_CONTRACT_ADDRESS,
@@ -135,7 +168,7 @@ const addToQueue = async (provider, tokenId, handleErrors) => {
     signer
   );
   console.log("Checking if in queue...");
-  const result = await HILOContract.checkInQueue().catch((err) =>
+  const result = await HILOContract.checkInQueue().catch((err: SolidityError) =>
     handleErrors(err)
   );
   console.log(result);
@@ -145,21 +178,25 @@ const addToQueue = async (provider, tokenId, handleErrors) => {
   if (index === 0) {
     console.log("Adding to queue...");
     return await HILOContract.addToQueue(tokenId)
-      .then((txn) => {
+      .then((txn: SolidityTxn) => {
         console.log(txn);
         return provider.waitForTransaction(txn.hash);
       })
-      .then((result) => {
-        console.log(result);
-        return result.toNumber();
+      .then((position: BigNumber) => {
+        console.log(position);
+        return position.toNumber();
       })
-      .catch((err) => handleErrors(err));
+      .catch((err: SolidityError) => handleErrors(err));
   }
 
   return index;
 };
 
-const checkApproval = async (provider, setApproved, amount) => {
+const checkApproval = async (
+  provider: providers.Web3Provider,
+  setApproved,
+  amount
+) => {
   const signer = provider.getSigner();
   const address = await signer.getAddress();
   const usdcABI = [
@@ -183,14 +220,9 @@ const checkApproval = async (provider, setApproved, amount) => {
 };
 
 const approvePayments = async (
-  _amount,
-  provider,
-  setPendingAmount,
-  handleErrors
-) => {
-  // Show in the UI
-  setPendingAmount(_amount);
-
+  _amount: number,
+  provider: providers.Web3Provider
+): Promise<SolidityTxnReceipt | SolidityError> => {
   const signer = provider.getSigner();
   const usdcABI = [
     "function approve(address _spender, uint256 _value) public returns (bool success)",
@@ -202,20 +234,24 @@ const approvePayments = async (
   const USDCContract = new Contract(CONSTANTS.USDC_ADDRESS, usdcABI, signer);
 
   return USDCContract.approve(CONSTANTS.HILO_CONTRACT_ADDRESS, amount)
-    .catch((err) => handleTxnError(err))
-    .then((txn) => provider.waitForTransaction(txn.hash))
-    .then((receipt) => {
+    .then((txn: SolidityTxn) => provider.waitForTransaction(txn.hash))
+    .catch((err: SolidityError) => maybeHandleTxnReplaced(err))
+    .then((receipt: SolidityTxnReceipt) => {
       console.log("Approved!", receipt);
-      setPendingAmount(0);
+      return receipt;
     })
-    .catch((err) => {
-      handleErrors(err);
-      // don't let us continue
-      throw err;
+    .catch((err: SolidityError) => {
+      console.log(err);
+      return err;
     });
 };
 
-const setupGameEvents = (provider, account, updateFn, bannerUpdate) => {
+const setupGameEvents = (
+  provider: providers.Web3Provider,
+  account: string,
+  updateFn: () => Promise<any>,
+  bannerUpdate: Dispatch<SetStateAction<Tokens>>
+) => {
   const HILOContract = new Contract(
     CONSTANTS.HILO_CONTRACT_ADDRESS,
     abi.abi,
@@ -224,7 +260,7 @@ const setupGameEvents = (provider, account, updateFn, bannerUpdate) => {
 
   let filter = HILOContract.filters.PriceUpdated(null);
 
-  HILOContract.on(filter, (player, _tokenId, event) => {
+  HILOContract.on(filter, (player: string, _tokenId: BigNumber, event: any) => {
     const tokenId = _tokenId.toNumber();
     console.log("PriceUpdated:", player, tokenId, event);
     if (player === account) return;
@@ -234,7 +270,7 @@ const setupGameEvents = (provider, account, updateFn, bannerUpdate) => {
 
   filter = HILOContract.filters.PricesConverged(null);
 
-  HILOContract.on(filter, (winners, price, event) => {
+  HILOContract.on(filter, (winners: string[], price: BigNumber, event: any) => {
     console.log("pricesConverged:", winners, price.toNumber(), event);
     if (winners.includes(account)) return; // skip if we just won
     updateFn();

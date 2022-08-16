@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 
@@ -6,9 +6,15 @@ import Web3Modal from "web3modal";
 import WalletConnectProvider from "@walletconnect/web3-provider";
 import { providers } from "ethers";
 
-import { GameState, PageState, Modals, Tokens } from "../lib/types";
+import {
+  GameState,
+  PageState,
+  Modals,
+  Tokens,
+  SolidityError,
+} from "../lib/types";
 
-import HiloModal from "../components/HiloModal";
+import HiloModal from "../components/modals/HiloModal";
 import ErrorBanner from "../components/ErrorBanner";
 import ConnectButton from "../components/buttons/ConnectButton";
 import ApproveButton from "../components/buttons/ApproveButton";
@@ -47,6 +53,14 @@ if (typeof window !== "undefined") {
   });
 }
 
+const usePrevious = (value: Modals | null): Modals | null => {
+  const ref = useRef<Modals | null>();
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+};
+
 export default function Home() {
   const [pageState, setPageState] = useState<PageState>(PageState.UNLOADED);
 
@@ -56,7 +70,8 @@ export default function Home() {
   const [account, setAccount] = useState<string | null>(null);
 
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [modalVisible, setModalVisible] = useState<Modals | null>(null);
+  const [modalVisible, setModalVisible] = useState<Modals | null>(undefined);
+
   const [walletError, setWalletError] = useState<string>(null);
   const [priceUpdated, setPriceUpdated] = useState<Tokens>(null);
 
@@ -116,15 +131,20 @@ export default function Home() {
   useEffect(() => {
     if (!wallet) return;
 
-    updateGameState().then((state: GameState) => {
-      setupGameEvents(provider, account, updateGameState, setPriceUpdated);
-      console.log(state);
-      if (state.winners.length > 0) {
-        setPageState(PageState.OVER);
-      } else {
-        setPageState(PageState.READY);
-      }
-    });
+    updateGameState()
+      .then((state: GameState) => {
+        setupGameEvents(provider, account, updateGameState, setPriceUpdated);
+
+        if (state.winners.length > 0) {
+          setPageState(PageState.OVER);
+        } else {
+          setPageState(PageState.READY);
+        }
+      })
+      .catch((error: SolidityError) => {
+        console.log(error);
+        setWalletError(getWalletError(error));
+      });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallet]);
@@ -162,6 +182,13 @@ export default function Home() {
     setPageState(PageState.READY);
     return state;
   };
+
+  useEffect(() => {
+    if (modalVisible === null) {
+      updateGameState();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalVisible]);
 
   ////////////////////////////////////////////////////////////////////////////////
   //                                                                            //
@@ -258,6 +285,13 @@ export default function Home() {
                 show={modalVisible === Modals.BUY}
                 modalType={modalVisible}
                 closeFn={() => setModalVisible(null)}
+                provider={provider}
+              />
+              <HiloModal
+                show={modalVisible === Modals.SELL}
+                modalType={modalVisible}
+                closeFn={() => setModalVisible(null)}
+                provider={provider}
               />
             </Grid.Container>
 
@@ -271,6 +305,7 @@ export default function Home() {
               show={modalVisible === Modals.APPROVE}
               modalType={modalVisible}
               closeFn={() => setModalVisible(null)}
+              provider={provider}
             />
           </>
         )}

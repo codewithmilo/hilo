@@ -1,7 +1,7 @@
 import { providers } from "ethers";
-import { Modals } from "../lib/types";
-import ApproveModal from "./modals/ApproveModal";
-import HowToModal from "./modals/HowToModal";
+import { Modals } from "../../lib/types";
+import ApproveModal from "./ApproveModal";
+import HowToModal from "./HowToModal";
 
 type HiloModalProps = {
   show: boolean;
@@ -20,7 +20,7 @@ export default function HiloModal(props: HiloModalInterface) {
     case Modals.HOW_TO_PLAY:
       return <HowToModal closeFn={props.closeFn} />;
     case Modals.APPROVE:
-      return <ApproveModal closeFn={props.closeFn} />;
+      return <ApproveModal closeFn={props.closeFn} provider={props.provider} />;
     default:
       return null;
   }
