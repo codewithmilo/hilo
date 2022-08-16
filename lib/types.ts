@@ -2,7 +2,6 @@ import { providers } from "ethers";
 
 export type SolidityTxn = providers.TransactionResponse;
 export type SolidityTxnReceipt = providers.TransactionReceipt;
-
 export function isSolidityTxnReceipt(
   receipt: any
 ): receipt is SolidityTxnReceipt {
@@ -11,7 +10,6 @@ export function isSolidityTxnReceipt(
 
 export type SolidityError = any;
 export type SolidityErrorHandler = (error: SolidityError) => void;
-
 export function isSolidityError(error: any): error is SolidityError {
   return error.code !== undefined;
 }
@@ -29,6 +27,8 @@ export enum Tokens {
   HI,
   LO,
 }
+export const tokenString = (token: Tokens) =>
+  token === Tokens.HI ? "Hi" : "Lo";
 
 export enum Modals {
   HOW_TO_PLAY,

@@ -71,6 +71,7 @@ export default function Home() {
 
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [modalVisible, setModalVisible] = useState<Modals | null>(undefined);
+  const [tokenAction, setTokenAction] = useState<Tokens | null>(null);
 
   const [walletError, setWalletError] = useState<string>(null);
   const [priceUpdated, setPriceUpdated] = useState<Tokens>(null);
@@ -183,6 +184,12 @@ export default function Home() {
     return state;
   };
 
+  const handleTokenAction = (token: Tokens, action: "buy" | "sell") => {
+    setTokenAction(token);
+    const modal = action === "buy" ? Modals.BUY : Modals.SELL;
+    setModalVisible(modal);
+  };
+
   useEffect(() => {
     if (modalVisible === null) {
       updateGameState();
@@ -269,16 +276,16 @@ export default function Home() {
                 <TokenCard
                   tokenType={Tokens.HI}
                   price={gameState.currentHi}
-                  buyFn={() => setModalVisible(Modals.BUY)}
-                  sellFn={() => setModalVisible(Modals.SELL)}
+                  buyFn={() => handleTokenAction(Tokens.HI, "buy")}
+                  sellFn={() => handleTokenAction(Tokens.HI, "sell")}
                 />
               </Grid>
               <Grid xs={6} sm={6} md={4}>
                 <TokenCard
                   tokenType={Tokens.LO}
                   price={gameState.currentLo}
-                  buyFn={() => setModalVisible(Modals.BUY)}
-                  sellFn={() => setModalVisible(Modals.SELL)}
+                  buyFn={() => handleTokenAction(Tokens.LO, "buy")}
+                  sellFn={() => handleTokenAction(Tokens.LO, "sell")}
                 />
               </Grid>
               <HiloModal
@@ -286,12 +293,16 @@ export default function Home() {
                 modalType={modalVisible}
                 closeFn={() => setModalVisible(null)}
                 provider={provider}
+                token={tokenAction}
+                gameState={gameState}
               />
               <HiloModal
                 show={modalVisible === Modals.SELL}
                 modalType={modalVisible}
                 closeFn={() => setModalVisible(null)}
                 provider={provider}
+                token={tokenAction}
+                gameState={gameState}
               />
             </Grid.Container>
 

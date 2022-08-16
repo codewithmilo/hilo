@@ -62,10 +62,6 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     // store transactions by price so we can pull it when they converge
     mapping(uint256 => Action[]) public actions;
 
-    // the list of players. they must be "registered" to play, to try to block bots
-    // mapping(address => bool) public players;
-    // uint256 public playerCount;
-
     bool public gameWon = false;
 
     // the winners!
@@ -84,7 +80,6 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     event PricesConverged(address[] winners, uint256 price);
     event JackpotPaid(address player, uint256 amount);
     event PriceUpdated(address player, uint256 tokenId);
-    event PlayerRegistered(address player);
 
     constructor(
         uint256 _initialHi,
@@ -114,18 +109,10 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         buyRequiredCount = _buyRequiredCount;
         buyCounts[HI] = 0;
         buyCounts[LO] = 0;
-        buyForceCount = _buyRequiredCount * 2;
+        buyForceCount = _buyRequiredCount + 1;
         buyForceCounts[HI] = 0;
         buyForceCounts[LO] = 0;
     }
-
-    // Only owner can register: bot prevention tactic!
-    // function registerPlayer(address player) public onlyOwner {
-    //     require(!players[player], "Player already registered");
-    //     players[player] = true;
-    //     playerCount = playerCount + 1;
-    //     emit PlayerRegistered(player);
-    // }
 
     function getGameState(address player)
         public
@@ -234,12 +221,12 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         usdc.transfer(owner(), balance); // gimme the rest!
     }
 
-    function buy(uint256 tokenId) public whenNotPaused {
-        // make sure they are registered
-        // require(players[msg.sender], "Unregistered player");
-
+    function buy(uint256 tokenId, uint256 amount) public whenNotPaused {
         // check if the token is valid
         require(tokenId == HI || tokenId == LO, "Invalid token.");
+
+        // check it's one of the allowed amounts
+        require(amount == 1 || amount == 3, "Invalid amount.");
 
         // get price
         uint256 price = getPrice(tokenId);
@@ -247,20 +234,21 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
 
         // update the price IF:
         // 1. it is the first buy of the game — otherwise first players are forced to sell at the same price
-        // 2. We've hit buyForceCount — if there's 2x the required buys to sell, push the price to keep the game moving
+        // 2. We've hit buyForceCount — push the price to keep the game moving
+        // 3. Player is buying buyForceCount at once
         // -- but make sure we haven't converged
         bool firstBuy = (price == initialLo && tokenId == LO) ||
             (price == initialHi && tokenId == HI);
         bool forceUpdate = buyForceCounts[tokenId] == buyForceCount;
 
-        if (hiPrice != loPrice && (firstBuy || forceUpdate)) {
+        if (hiPrice != loPrice && (firstBuy || forceUpdate || amount == 3)) {
             updatePrice(tokenId);
             emit PriceUpdated(msg.sender, tokenId);
         }
 
         // check if the player has enough to buy
         // change to gwei here as we are dealing with tokens
-        price = price * 1 ether;
+        price = price * amount * 1 ether;
 
         uint256 playerBalance = usdc.balanceOf(msg.sender);
         require(playerBalance >= price, "Insufficient USDC balance.");
@@ -269,7 +257,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         usdc.transferFrom(msg.sender, address(this), price);
 
         // mint the token for them
-        _mint(msg.sender, tokenId, 1, "");
+        _mint(msg.sender, tokenId, amount, "");
 
         // update counts, unless we hit the force update
         if (!forceUpdate) {
@@ -281,9 +269,6 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     }
 
     function checkInQueue(uint256 tokenId) public view returns (uint256) {
-        // make sure they are registered
-        // require(players[msg.sender], "Unregistered player");
-
         // This one lets the saleQueue grow forever, and we keep looping through it,
         // though we do only go through the active queue. The bet is that there will
         // never be enough players for this to be an issue...famous last words
@@ -298,9 +283,6 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     }
 
     function addToQueue(uint256 tokenId) public returns (uint256) {
-        // make sure they are registered
-        // require(players[msg.sender], "Unregistered player");
-
         // check we aren't already in it
         uint256 position = checkInQueue(tokenId);
         if (position > 0) return position;
@@ -334,9 +316,6 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     }
 
     function sell(uint256 tokenId) public nonReentrant {
-        // make sure they are registered
-        // require(players[msg.sender], "Unregistered player");
-
         // this is because we want to sell from the queue sometimes.
         // TBD if this will actually work, since we aren't signing the transaction
         address player = msg.sender;

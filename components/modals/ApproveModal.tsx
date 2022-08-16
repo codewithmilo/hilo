@@ -20,16 +20,17 @@ export default function ApproveModal(props: ApproveModalProps) {
 
   const approveFn = async (provider: providers.Web3Provider) => {
     setPending(true);
+    setError(null);
     const approvalOrError = await approvePayments(
       CONSTANTS.MAX_APPROVAL_AMOUNT,
       provider
     );
     if (isSolidityTxnReceipt(approvalOrError)) {
       setSuccess(true);
-      setPending(false);
     } else {
       setError(GetErrorMsg(approvalOrError));
     }
+    setPending(false);
   };
 
   return (

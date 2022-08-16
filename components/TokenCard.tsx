@@ -1,6 +1,6 @@
 import { Button, Card, Text } from "@nextui-org/react";
 import { Component } from "react";
-import { Tokens } from "../lib/types";
+import { Tokens, tokenString } from "../lib/types";
 
 type TokenCardProps = {
   tokenType: Tokens;
@@ -16,11 +16,11 @@ export default class TokenCard extends Component<TokenCardProps> {
 
   render() {
     const { tokenType, price, buyFn, sellFn } = this.props;
-    const tokenStr = tokenType === Tokens.HI ? "Hi" : "Lo";
+
     return (
       <Card variant="bordered">
         <Card.Body css={{ textAlign: "center !important" }}>
-          <Text h1>{tokenStr}</Text>
+          <Text h1>{tokenString(tokenType)}</Text>
           <Text h2>${price}</Text>
         </Card.Body>
         <Card.Divider />

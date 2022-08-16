@@ -34,7 +34,7 @@ const maybeHandleTxnReplaced = (err: SolidityError): SolidityTxn | void => {
   }
 };
 
-const getGameState = async (
+export const getGameState = async (
   provider: providers.Web3Provider,
   address: string
 ): Promise<GameState | SolidityError> => {
@@ -192,11 +192,34 @@ const addToQueue = async (
   return index;
 };
 
+export const buy = async (
+  provider: providers.Web3Provider,
+  token: Tokens,
+  amount: 1 | 3
+): Promise<SolidityTxnReceipt | SolidityError> => {
+  const signer = provider.getSigner();
+  const HILOContract = new Contract(
+    CONSTANTS.HILO_CONTRACT_ADDRESS,
+    abi.abi,
+    signer
+  );
+  return HILOContract.buy(token, amount)
+    .then((txn: SolidityTxn) => provider.waitForTransaction(txn.hash))
+    .catch((err: SolidityError) => maybeHandleTxnReplaced(err))
+    .then((receipt: SolidityTxnReceipt) => {
+      console.log("Bought!", receipt);
+      return receipt;
+    })
+    .catch((err: SolidityError) => {
+      console.log(err);
+      return err;
+    });
+};
+
 const checkApproval = async (
   provider: providers.Web3Provider,
-  setApproved,
-  amount
-) => {
+  amount: number
+): Promise<boolean> => {
   const signer = provider.getSigner();
   const address = await signer.getAddress();
   const usdcABI = [
@@ -205,21 +228,15 @@ const checkApproval = async (
   const USDCContract = new Contract(CONSTANTS.USDC_ADDRESS, usdcABI, signer);
 
   return USDCContract.allowance(address, CONSTANTS.HILO_CONTRACT_ADDRESS).then(
-    (_allowance) => {
+    (_allowance: BigNumber) => {
       const allowance = parseInt(utils.formatEther(_allowance));
       console.log("Allowance is", allowance);
-
-      if (allowance >= amount) {
-        setApproved(true);
-        return true;
-      } else {
-        return false;
-      }
+      return allowance >= amount;
     }
   );
 };
 
-const approvePayments = async (
+export const approvePayments = async (
   _amount: number,
   provider: providers.Web3Provider
 ): Promise<SolidityTxnReceipt | SolidityError> => {
@@ -246,7 +263,7 @@ const approvePayments = async (
     });
 };
 
-const setupGameEvents = (
+export const setupGameEvents = (
   provider: providers.Web3Provider,
   account: string,
   updateFn: () => Promise<any>,
@@ -275,16 +292,4 @@ const setupGameEvents = (
     if (winners.includes(account)) return; // skip if we just won
     updateFn();
   });
-};
-
-export {
-  getGameState,
-  getPrice,
-  getBalance,
-  getPlayerTotals,
-  getWinners,
-  addToQueue,
-  checkApproval,
-  approvePayments,
-  setupGameEvents,
 };
