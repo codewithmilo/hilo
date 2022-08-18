@@ -33,6 +33,9 @@ export function Balances(props: BalancesProps) {
   const hiBalance = balances[0];
   const loBalance = balances[1];
 
+  const hiVisible = hiBalance > 0;
+  const loVisible = loBalance > 0;
+
   if (hiBalance === 0 && loBalance === 0) return null;
 
   const balanceStr = (balance: number, tokenType: Tokens) => {
@@ -43,29 +46,45 @@ export function Balances(props: BalancesProps) {
   };
 
   return (
-    <Grid.Container gap={1} justify="center">
-      <Grid xs={6} justify="flex-end">
-        <Card
-          variant="bordered"
-          css={{
-            maxWidth: "200px",
-            padding: "10px",
-          }}
+    <Grid.Container gap={1}>
+      {hiVisible && (
+        <Grid
+          xs={loVisible ? 6 : 12}
+          justify={loVisible ? "flex-end" : "center"}
         >
-          <Text h5 css={{ textAlign: "center" }}>
-            You have {balanceStr(hiBalance, Tokens.HI)}
-          </Text>
-          <Image alt="Hi token" height={40} src="/img/hiToken.png" />
-        </Card>
-      </Grid>
-      <Grid xs={6}>
-        <Card variant="bordered" css={{ maxWidth: "200px", padding: "10px" }}>
-          <Text h5 css={{ textAlign: "center" }}>
-            You have {balanceStr(loBalance, Tokens.LO)}
-          </Text>
-          <Image alt="Lo token" height={40} src="/img/loToken.png" />
-        </Card>
-      </Grid>
+          <Card
+            variant="bordered"
+            css={{
+              maxWidth: "200px",
+              padding: "10px",
+            }}
+          >
+            <Text h5 css={{ textAlign: "center" }}>
+              You have {balanceStr(hiBalance, Tokens.HI)}
+            </Text>
+            <Image alt="Hi token" height={40} src="/img/hiToken.png" />
+          </Card>
+        </Grid>
+      )}
+      {loVisible && (
+        <Grid
+          xs={hiVisible ? 6 : 12}
+          justify={hiVisible ? "flex-start" : "center"}
+        >
+          <Card
+            variant="bordered"
+            css={{
+              maxWidth: "200px",
+              padding: "10px",
+            }}
+          >
+            <Text h5 css={{ textAlign: "center" }}>
+              You have {balanceStr(loBalance, Tokens.LO)}
+            </Text>
+            <Image alt="Lo token" height={40} src="/img/loToken.png" />
+          </Card>
+        </Grid>
+      )}
     </Grid.Container>
   );
 }

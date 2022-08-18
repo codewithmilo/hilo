@@ -134,7 +134,7 @@ export default function Home() {
 
     updateGameState()
       .then((state: GameState) => {
-        setupGameEvents(provider, account, updateGameState, setPriceUpdated);
+        setupGameEvents(provider, account, updateGameState, showPriceUpdate);
 
         if (state.winners.length > 0) {
           setPageState(PageState.OVER);
@@ -182,6 +182,10 @@ export default function Home() {
     setGameState(state);
     setPageState(PageState.READY);
     return state;
+  };
+
+  const showPriceUpdate = (token: Tokens) => {
+    setPriceUpdated(token);
   };
 
   const handleTokenAction = (token: Tokens, action: "buy" | "sell") => {
@@ -278,6 +282,7 @@ export default function Home() {
                   price={gameState.currentHi}
                   buyFn={() => handleTokenAction(Tokens.HI, "buy")}
                   sellFn={() => handleTokenAction(Tokens.HI, "sell")}
+                  balance={gameState.tokenBalances[Tokens.HI]}
                 />
               </Grid>
               <Grid xs={6} sm={6} md={4}>
@@ -286,6 +291,7 @@ export default function Home() {
                   price={gameState.currentLo}
                   buyFn={() => handleTokenAction(Tokens.LO, "buy")}
                   sellFn={() => handleTokenAction(Tokens.LO, "sell")}
+                  balance={gameState.tokenBalances[Tokens.LO]}
                 />
               </Grid>
               <HiloModal

@@ -87,11 +87,7 @@ export default function ApproveModal(props: ApproveModalProps) {
           <Text h4>{success ? "Close" : "Cancel"}</Text>
         </Button>
         {!success && (
-          <Button
-            auto
-            onPress={() => approveFn(provider)}
-            disabled={pending || success}
-          >
+          <Button auto onPress={() => approveFn(provider)} disabled={pending}>
             {pending ? <Loading size="sm" /> : <Text h4>Approve</Text>}
           </Button>
         )}

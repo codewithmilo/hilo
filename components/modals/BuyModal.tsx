@@ -39,17 +39,6 @@ export default function BuyModal(props: BuyModalProps) {
 
   const { closeFn, provider, token, gameState } = props;
 
-  const getPendingMsg = (state: PendingState, amount: number) => {
-    switch (state) {
-      case PendingState.APPROVING:
-        return "Approving spend...";
-      case PendingState.BUYING:
-        return `Buying ${amount} tokens...`;
-      default:
-        return "";
-    }
-  };
-
   const successMsg = (
     <Text css={{ marginRight: "20px" }}>
       Successfully bought {amount} {tokenString(token)} token
@@ -60,15 +49,14 @@ export default function BuyModal(props: BuyModalProps) {
   const buyFn = async (provider: providers.Web3Provider) => {
     setError(null);
 
-    const cost =
-      amount *
-      (token === Tokens.HI ? gameState.currentHi : gameState.currentLo);
+    const cost = amount * tokenPrice;
 
     if (cost > gameState.approvedSpend) {
       setPending(PendingState.APPROVING);
       const approvalOrError = await approvePayments(cost, provider);
       if (isSolidityError(approvalOrError)) {
-        return setError(GetErrorMsg(approvalOrError));
+        setError(GetErrorMsg(approvalOrError));
+        return setPending(null);
       }
     }
 
@@ -150,9 +138,14 @@ export default function BuyModal(props: BuyModalProps) {
       <Modal.Footer css={{ borderTop: "1px solid grey" }}>
         <Grid>
           {error && <Text color="error">{error}</Text>}
-          {pending && (
-            <Text css={{ marginRight: "20px" }}>
-              {getPendingMsg(pending, amount)}
+          {pending !== null && (
+            <Text css={{ marginRight: "10px" }}>
+              {pending === (PendingState.APPROVING as PendingState)
+                ? "Approving spend..."
+                : "Buying " +
+                  amount +
+                  (amount > 1 ? " tokens" : " token") +
+                  "..."}
             </Text>
           )}
           {success && successMsg}
@@ -170,7 +163,7 @@ export default function BuyModal(props: BuyModalProps) {
           <Button
             auto
             onPress={() => buyFn(provider)}
-            disabled={pending !== null || success}
+            disabled={pending !== null}
           >
             {pending !== null ? <Loading size="sm" /> : <Text h4>Buy</Text>}
           </Button>

@@ -216,6 +216,29 @@ export const buy = async (
     });
 };
 
+export const sell = async (
+  provider: providers.Web3Provider,
+  token: Tokens
+): Promise<SolidityTxnReceipt | SolidityError> => {
+  const signer = provider.getSigner();
+  const HILOContract = new Contract(
+    CONSTANTS.HILO_CONTRACT_ADDRESS,
+    abi.abi,
+    signer
+  );
+  return HILOContract.sell(token)
+    .then((txn: SolidityTxn) => provider.waitForTransaction(txn.hash))
+    .catch((err: SolidityError) => maybeHandleTxnReplaced(err))
+    .then((receipt: SolidityTxnReceipt) => {
+      console.log("Sold!", receipt);
+      return receipt;
+    })
+    .catch((err: SolidityError) => {
+      console.log(err);
+      return err;
+    });
+};
+
 const checkApproval = async (
   provider: providers.Web3Provider,
   amount: number
@@ -267,7 +290,7 @@ export const setupGameEvents = (
   provider: providers.Web3Provider,
   account: string,
   updateFn: () => Promise<any>,
-  bannerUpdate: Dispatch<SetStateAction<Tokens>>
+  bannerUpdate: (token: Tokens) => void
 ) => {
   const HILOContract = new Contract(
     CONSTANTS.HILO_CONTRACT_ADDRESS,
@@ -278,7 +301,7 @@ export const setupGameEvents = (
   let filter = HILOContract.filters.PriceUpdated(null);
 
   HILOContract.on(filter, (player: string, _tokenId: BigNumber, event: any) => {
-    const tokenId = _tokenId.toNumber();
+    const tokenId = _tokenId.toNumber() as Tokens;
     console.log("PriceUpdated:", player, tokenId, event);
     if (player === account) return;
     bannerUpdate(tokenId);

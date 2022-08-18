@@ -7,6 +7,7 @@ type TokenCardProps = {
   price: number;
   buyFn: () => void;
   sellFn: () => void;
+  balance: number;
 };
 
 export default class TokenCard extends Component<TokenCardProps> {
@@ -15,7 +16,7 @@ export default class TokenCard extends Component<TokenCardProps> {
   }
 
   render() {
-    const { tokenType, price, buyFn, sellFn } = this.props;
+    const { tokenType, price, buyFn, sellFn, balance } = this.props;
 
     return (
       <Card variant="bordered">
@@ -29,7 +30,7 @@ export default class TokenCard extends Component<TokenCardProps> {
             <Button onPress={buyFn}>
               <Text h3>Buy</Text>
             </Button>
-            <Button onPress={sellFn}>
+            <Button onPress={sellFn} disabled={balance == 0}>
               <Text h3>Sell</Text>
             </Button>
           </Button.Group>

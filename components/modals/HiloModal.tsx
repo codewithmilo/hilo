@@ -3,6 +3,7 @@ import { GameState, Modals, Tokens } from "../../lib/types";
 import ApproveModal from "./ApproveModal";
 import BuyModal from "./BuyModal";
 import HowToModal from "./HowToModal";
+import SellModal from "./SellModal";
 
 type HiloModalProps = {
   show: boolean;
