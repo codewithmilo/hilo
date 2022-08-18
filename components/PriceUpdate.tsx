@@ -8,7 +8,6 @@ type PriceUpdateProps = {
 };
 
 export default function PriceUpdate(props: PriceUpdateProps) {
-  console.log(props);
   if (props.token === null) return null;
   const { token, closeFn } = props;
   const changeStr = token === CONSTANTS.HI_TOKEN_ID ? "decreased" : "increased";

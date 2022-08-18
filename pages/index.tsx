@@ -95,6 +95,7 @@ export default function Home() {
   // When we have a wallet, setup wallet events
   useEffect(() => {
     if (!wallet) return;
+    console.log("Setting up wallet events");
 
     // HANDLE WALLET CHANGES
     const handleAccountsChanged = (accounts: string[]) => {
@@ -119,6 +120,7 @@ export default function Home() {
     wallet.on("accountsChanged", handleAccountsChanged);
     wallet.on("chainChanged", handleChainChanged);
     wallet.on("disconnect", handleDisconnect);
+    console.log("Wallet events setup", wallet);
 
     return () => {
       if (wallet.removeListener) {
@@ -126,11 +128,11 @@ export default function Home() {
         wallet.removeListener("chainChanged", handleChainChanged);
       }
     };
-  }, [wallet, account, provider]);
+  }, [wallet]);
 
   // When we have a wallet connected, set up the game
   useEffect(() => {
-    if (!wallet) return;
+    if (!provider) return;
 
     updateGameState()
       .then((state: GameState) => {
@@ -148,7 +150,7 @@ export default function Home() {
       });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallet]);
+  }, [provider]);
 
   ////////////////////////////////////////////////////////////////////////////////
   //                                                                            //
@@ -164,15 +166,16 @@ export default function Home() {
         const accounts = await library.listAccounts();
         const network = await library.getNetwork();
 
-        // // make sure we're on polygon
+        setWallet(instance);
+        if (accounts) setAccount(accounts[0]);
+
         if (network.chainId !== CONSTANTS.CHAIN_ID) {
-          web3Modal.clearCachedProvider();
+          console.log("bad chain");
+          setPageState(PageState.NO_WALLET);
           throw new Error("bad_chain");
         }
 
-        setWallet(instance);
         setProvider(library);
-        if (accounts) setAccount(accounts[0]);
       })
       .catch((err) => setWalletError(getWalletError(err)));
   };
@@ -240,7 +243,7 @@ export default function Home() {
             </Text>
             <ErrorBanner error={walletError} closeFn={null} />
             <Spacer y={10} />
-            <ConnectButton connectFn={connectWallet} />
+            {!wallet && <ConnectButton connectFn={connectWallet} />}
           </>
         )}
 

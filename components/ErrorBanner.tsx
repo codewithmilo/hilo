@@ -6,7 +6,7 @@ type ErrorBannerProps = {
 };
 
 export default function ErrorBanner(props: ErrorBannerProps) {
-  const { error, closeFn } = this.props;
+  const { error, closeFn } = props;
 
   if (!error) return null;
 
