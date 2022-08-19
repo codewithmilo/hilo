@@ -119,7 +119,7 @@ export function PlayerTotals(props: PlayerTotalsProps) {
   return (
     <Card variant="bordered" css={{ maxWidth: "150px", margin: "0 auto" }}>
       <Text h5 css={{ textAlign: "center" }}>
-        {totals[0] + totals[1]} players
+        {totals[2]} players
       </Text>
       <Grid xs={12} md={12} justify="center">
         <Text h4 color="#D172F5">

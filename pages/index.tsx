@@ -53,14 +53,6 @@ if (typeof window !== "undefined") {
   });
 }
 
-const usePrevious = (value: Modals | null): Modals | null => {
-  const ref = useRef<Modals | null>();
-  useEffect(() => {
-    ref.current = value;
-  });
-  return ref.current;
-};
-
 export default function Home() {
   const [pageState, setPageState] = useState<PageState>(PageState.UNLOADED);
 
@@ -95,10 +87,9 @@ export default function Home() {
   // When we have a wallet, setup wallet events
   useEffect(() => {
     if (!wallet) return;
-    console.log("Setting up wallet events");
 
     // HANDLE WALLET CHANGES
-    const handleAccountsChanged = (accounts: string[]) => {
+    const handleAccountsChanged = (accounts) => {
       console.log("accountsChanged", accounts);
       if (!accounts.length) {
         // this is effectively a disconnect
@@ -112,15 +103,8 @@ export default function Home() {
       window.location.reload();
     };
 
-    const handleDisconnect = () => {
-      web3Modal.clearCachedProvider();
-      window.location.reload();
-    };
-
     wallet.on("accountsChanged", handleAccountsChanged);
     wallet.on("chainChanged", handleChainChanged);
-    wallet.on("disconnect", handleDisconnect);
-    console.log("Wallet events setup", wallet);
 
     return () => {
       if (wallet.removeListener) {
@@ -128,7 +112,7 @@ export default function Home() {
         wallet.removeListener("chainChanged", handleChainChanged);
       }
     };
-  }, [wallet]);
+  }, [wallet, provider, account]);
 
   // When we have a wallet connected, set up the game
   useEffect(() => {
@@ -167,6 +151,7 @@ export default function Home() {
         const network = await library.getNetwork();
 
         setWallet(instance);
+        console.log(accounts);
         if (accounts) setAccount(accounts[0]);
 
         if (network.chainId !== CONSTANTS.CHAIN_ID) {

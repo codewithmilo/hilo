@@ -37,12 +37,9 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     mapping(uint256 => uint256) public buyForceCounts;
 
     // queue for sales
-    struct saleQueueItem {
-        address player;
-        uint256 tokenId;
-    }
-    saleQueueItem[] public saleQueue;
-    uint256 public saleQueueIndex = 0;
+    mapping(uint256 => address[]) public saleQueue;
+    uint256 public hiSaleQueueIndex = 0;
+    uint256 public loSaleQueueIndex = 0;
 
     struct Action {
         address player;
@@ -54,13 +51,17 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         uint256 currentHi;
         uint256 currentLo;
         address[] winners;
-        uint256[2] playerTotals;
+        uint256[3] playerTotals;
         uint256[2] tokenBalances;
         uint256 approvedSpend;
     }
 
     // store transactions by price so we can pull it when they converge
     mapping(uint256 => Action[]) public actions;
+
+    // all the players holding tokens
+    mapping(address => bool) private players;
+    uint256 public playerCount = 0;
 
     bool public gameWon = false;
 
@@ -130,7 +131,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
                 hiPrice,
                 loPrice,
                 winners,
-                [hiTotal, loTotal],
+                [hiTotal, loTotal, playerCount],
                 [hiBalance, loBalance],
                 approvedSpend
             );
@@ -178,6 +179,22 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
 
         if (buyForceCounts[tokenId] < buyForceCount) {
             buyForceCounts[tokenId] = buyForceCounts[tokenId] + 1;
+        }
+    }
+
+    function updatePlayers(address player) private {
+        // get how many they have
+        uint256 hiBalance = balanceOf(player, HI);
+        uint256 loBalance = balanceOf(player, LO);
+        bool hasTokens = (hiBalance > 0) || (loBalance > 0);
+        bool existingPlayer = players[player];
+
+        if (hasTokens && !existingPlayer) {
+            players[player] = true;
+            playerCount = playerCount + 1;
+        } else if (!hasTokens && existingPlayer) {
+            players[player] = false;
+            playerCount = playerCount - 1;
         }
     }
 
@@ -265,7 +282,14 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         }
 
         // if we've hit the buy threshold, kick off any sales in the queue
-        if (buyCounts[tokenId] == buyRequiredCount) sellFromQueue();
+        if (buyCounts[tokenId] == buyRequiredCount) sellFromQueue(tokenId);
+
+        // update the players count
+        updatePlayers(msg.sender);
+    }
+
+    function canSell(uint256 tokenId) public view returns (bool) {
+        return buyCounts[tokenId] == buyRequiredCount;
     }
 
     function checkInQueue(uint256 tokenId) public view returns (uint256) {
@@ -273,11 +297,13 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         // though we do only go through the active queue. The bet is that there will
         // never be enough players for this to be an issue...famous last words
         uint256 position = 1;
-        for (uint256 i = saleQueueIndex; i < saleQueue.length; i++) {
-            if (saleQueue[i].player == msg.sender) {
+        address[] memory queue = saleQueue[tokenId];
+        uint256 index = tokenId == HI ? hiSaleQueueIndex : loSaleQueueIndex;
+        for (uint256 i = index; i < queue.length; i++) {
+            if (queue[i] == msg.sender) {
                 return position;
             }
-            if (saleQueue[i].tokenId == tokenId) position += 1;
+            position = position + 1;
         }
         return 0;
     }
@@ -288,31 +314,36 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         if (position > 0) return position;
 
         // add to queue
-        saleQueueItem memory item = saleQueueItem(msg.sender, tokenId);
-        saleQueue.push(item);
+        saleQueue[tokenId].push(msg.sender);
 
         // return how many in line
-        return saleQueue.length - saleQueueIndex;
+        uint256 index = tokenId == HI ? hiSaleQueueIndex : loSaleQueueIndex;
+        return saleQueue[tokenId].length - index;
     }
 
-    function sellFromQueue() private whenNotPaused {
+    function sellFromQueue(uint256 tokenId) private whenNotPaused {
         // nothing to do if nothing in the queue!
-        if (saleQueue.length == 0) return;
+        if (saleQueue[tokenId].length == 0) return;
 
         // get the next player waiting in the sell queue
         // since we can't pop from the dynamic array, we just increase the index here
         // and the next address, whether already in line or added, will be there
-        saleQueueItem memory nextSellerItem = saleQueue[saleQueueIndex++];
+        uint256 index = tokenId == HI ? hiSaleQueueIndex : loSaleQueueIndex;
+        address player = saleQueue[tokenId][index];
 
         // make sure they still have the one they planned to sell
-        uint256 tokenBalance = balanceOf(
-            nextSellerItem.player,
-            nextSellerItem.tokenId
-        );
+        uint256 tokenBalance = balanceOf(player, tokenId);
         if (tokenBalance == 0) return; // no tokens to sell (must've sold manually)
 
         // sell the token
-        _sell(nextSellerItem.player, nextSellerItem.tokenId);
+        _sell(player, tokenId);
+
+        // update the queue index
+        if (tokenId == HI) hiSaleQueueIndex = hiSaleQueueIndex + 1;
+        else loSaleQueueIndex = loSaleQueueIndex + 1;
+
+        // update the players count
+        updatePlayers(player);
     }
 
     function sell(uint256 tokenId) public nonReentrant {
@@ -320,6 +351,9 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         // TBD if this will actually work, since we aren't signing the transaction
         address player = msg.sender;
         _sell(player, tokenId);
+
+        // update the players count
+        updatePlayers(player);
     }
 
     function _sell(address player, uint256 tokenId) private whenNotPaused {
@@ -377,7 +411,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     function _transferOwnership(address newOwner) internal override {
         require(
             owner() == address(0) || newOwner == owner(),
-            "HILO: cannot transfer ownership to"
+            "HILO: cannot transfer ownership"
         );
         super._transferOwnership(newOwner);
     }

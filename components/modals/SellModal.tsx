@@ -1,19 +1,15 @@
-import {
-  Button,
-  Card,
-  Grid,
-  Image,
-  Loading,
-  Modal,
-  Text,
-} from "@nextui-org/react";
+import { Button, Grid, Loading, Modal, Text } from "@nextui-org/react";
 import { providers } from "ethers";
-import { useState } from "react";
-import { approvePayments, buy, sell } from "../../lib/contract";
+import { useEffect, useState } from "react";
+import {
+  checkCanSell,
+  checkQueuePosition,
+  joinSellQueue,
+  sell,
+} from "../../lib/contract";
 import { GetErrorMsg } from "../../lib/errors";
 import {
   GameState,
-  isSolidityError,
   isSolidityTxnReceipt,
   Tokens,
   tokenString,
@@ -30,16 +26,26 @@ export default function SellModal(props: SellModalProps) {
   const [pending, setPending] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [canSell, setCanSell] = useState<boolean>(false);
+  const [queuePosition, setQueuePosition] = useState<number>(0);
 
   const { closeFn, provider, token, gameState } = props;
 
-  const sellFn = async (provider: providers.Web3Provider) => {
+  const sellOrJoinQueue = async () => {
+    if (canSell) {
+      return sellFn();
+    } else {
+      return joinQueue();
+    }
+  };
+
+  const sellFn = async () => {
     setError(null);
     setPending(true);
 
     const sellOrError = await sell(provider, token);
     if (isSolidityTxnReceipt(sellOrError)) {
-      console.log("Bought!", token, sellOrError);
+      console.log("Sold!", token, sellOrError);
       setSuccess(true);
     } else {
       setError(GetErrorMsg(sellOrError));
@@ -47,11 +53,59 @@ export default function SellModal(props: SellModalProps) {
     setPending(null);
   };
 
-  const tokenIcon =
-    token === Tokens.HI ? "/img/hiToken.png" : "/img/loToken.png";
+  const joinQueue = async () => {
+    setError(null);
+    setPending(true);
+
+    const positionOrError = await joinSellQueue(provider, token);
+    if (typeof positionOrError === "number") {
+      console.log("Joined!", token, positionOrError);
+      setQueuePosition(positionOrError);
+      setSuccess(true);
+    } else {
+      setError(GetErrorMsg(positionOrError));
+    }
+    setPending(null);
+  };
+
   const tokenPrice =
     token === Tokens.HI ? gameState.currentHi : gameState.currentLo;
   const tokenBalance = gameState.tokenBalances[token];
+
+  // check if we can sell/queue position on render
+  useEffect(() => {
+    let _canSell: boolean, _queuePosition: number;
+    (async () => {
+      // You can await here
+      _canSell = await checkCanSell(provider, token);
+      _queuePosition = await checkQueuePosition(provider, token);
+    })();
+
+    setCanSell(_canSell);
+    setQueuePosition(_queuePosition);
+  }, [provider, token]);
+
+  const SellDescription = (
+    <Text size="1.3rem">
+      {tokenBalance > 1
+        ? `You may only sell one token for ${tokenPrice} USDC.`
+        : `Sell your token for ${tokenPrice} USDC.`}
+      <br />
+      The price will {token === Tokens.HI ? "decrease " : "increase "} after
+      this purchase.
+    </Text>
+  );
+
+  const SellQueue = (
+    <Text size="1.3rem">
+      Selling is currently locked for this price. <br />
+      {queuePosition > 0
+        ? queuePosition == 1
+          ? `You are next in line to sell.`
+          : `You are number ${queuePosition} in line to sell.`
+        : "You may join the sell queue: when the price of tokens change, HILO will automatically sell for the next player in line.\nWould you like to join the queue?"}
+    </Text>
+  );
 
   return (
     <Modal
@@ -67,23 +121,18 @@ export default function SellModal(props: SellModalProps) {
           Sell {tokenString(token)}
         </Text>
       </Modal.Header>
-      <Modal.Body>
-        <Text size="1.3rem">
-          {tokenBalance > 1
-            ? `You may only sell one token for ${tokenPrice} USDC.`
-            : `Sell your token for ${tokenPrice} USDC.`}
-          <br />
-          The price will {token === Tokens.HI ? "decrease " : "increase "} after
-          this purchase.
-        </Text>
-      </Modal.Body>
+      <Modal.Body>{canSell ? SellDescription : SellQueue}</Modal.Body>
       <Modal.Footer css={{ borderTop: "1px solid grey" }}>
         <Grid>
           {error && <Text color="error">{error}</Text>}
-          {pending && <Text css={{ marginRight: "10px" }}>Selling...</Text>}
+          {pending && (
+            <Text css={{ marginRight: "10px" }}>
+              {canSell ? "Selling..." : "Joining queue..."}
+            </Text>
+          )}
           {success && (
             <Text css={{ marginRight: "20px" }}>
-              Sold {tokenString(token)} token!
+              {canSell ? `Sold ${tokenString(token)} token!` : `Joined queue!`}
             </Text>
           )}
         </Grid>
@@ -91,8 +140,12 @@ export default function SellModal(props: SellModalProps) {
           <Text h4>{success ? "Close" : "Cancel"}</Text>
         </Button>
         {!success && (
-          <Button auto onPress={() => sellFn(provider)} disabled={pending}>
-            {pending ? <Loading size="sm" /> : <Text h4>Sell</Text>}
+          <Button auto onPress={sellOrJoinQueue} disabled={pending}>
+            {pending ? (
+              <Loading size="sm" />
+            ) : (
+              <Text h4>{canSell ? "Sell" : "Join Queue"}</Text>
+            )}
           </Button>
         )}
       </Modal.Footer>

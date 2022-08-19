@@ -156,40 +156,56 @@ const getWinners = async (provider, handleErrors) => {
     .catch((err) => handleErrors(err));
 };
 
-const addToQueue = async (
+export const checkCanSell = async (
   provider: providers.Web3Provider,
-  tokenId: Tokens,
-  handleErrors: SolidityErrorHandler
-): Promise<number> => {
+  tokenId: Tokens
+): Promise<SolidityError | boolean> => {
+  const HILOContract = new Contract(
+    CONSTANTS.HILO_CONTRACT_ADDRESS,
+    abi.abi,
+    provider
+  );
+
+  return HILOContract.canSell(tokenId)
+    .then((canSell: boolean) => {
+      console.log("canSell:", canSell);
+      return canSell;
+    })
+    .catch((err: SolidityError) => err);
+};
+
+export const checkQueuePosition = async (
+  provider: providers.Web3Provider,
+  tokenId: Tokens
+): Promise<SolidityError | number> => {
+  const HILOContract = new Contract(
+    CONSTANTS.HILO_CONTRACT_ADDRESS,
+    abi.abi,
+    provider
+  );
+
+  return HILOContract.checkInQueue(tokenId)
+    .then((position: BigNumber) => {
+      console.log("position:", position.toNumber());
+      return position.toNumber();
+    })
+    .catch((err: SolidityError) => err);
+};
+
+export const joinSellQueue = async (
+  provider: providers.Web3Provider,
+  tokenId: Tokens
+): Promise<SolidityError | number> => {
   const signer = provider.getSigner();
   const HILOContract = new Contract(
     CONSTANTS.HILO_CONTRACT_ADDRESS,
     abi.abi,
     signer
   );
-  console.log("Checking if in queue...");
-  const result = await HILOContract.checkInQueue().catch((err: SolidityError) =>
-    handleErrors(err)
-  );
-  console.log(result);
-  const index = result.toNumber();
-  console.log("In queue at index", index);
-
-  if (index === 0) {
-    console.log("Adding to queue...");
-    return await HILOContract.addToQueue(tokenId)
-      .then((txn: SolidityTxn) => {
-        console.log(txn);
-        return provider.waitForTransaction(txn.hash);
-      })
-      .then((position: BigNumber) => {
-        console.log(position);
-        return position.toNumber();
-      })
-      .catch((err: SolidityError) => handleErrors(err));
-  }
-
-  return index;
+  return await HILOContract.addToQueue(tokenId)
+    .then((txn: SolidityTxn) => provider.waitForTransaction(txn.hash))
+    .then((position: BigNumber) => position.toNumber())
+    .catch((err: SolidityError) => err);
 };
 
 export const buy = async (
