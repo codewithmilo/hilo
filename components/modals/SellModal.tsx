@@ -1,4 +1,4 @@
-import { Button, Grid, Loading, Modal, Text } from "@nextui-org/react";
+import { Button, Grid, Loading, Modal, Spacer, Text } from "@nextui-org/react";
 import { providers } from "ethers";
 import { useEffect, useState } from "react";
 import {
@@ -98,12 +98,21 @@ export default function SellModal(props: SellModalProps) {
 
   const SellQueue = (
     <Text size="1.3rem">
-      Selling is currently locked for this price. <br />
-      {queuePosition > 0
-        ? queuePosition == 1
-          ? `You are next in line to sell.`
-          : `You are number ${queuePosition} in line to sell.`
-        : "You may join the sell queue: when the price of tokens change, HILO will automatically sell for the next player in line.\nWould you like to join the queue?"}
+      Selling is currently locked for this price. <Spacer y={1} />
+      {queuePosition > 0 ? (
+        queuePosition == 1 ? (
+          `You are next in line to sell.`
+        ) : (
+          `You are number ${queuePosition} in line to sell.`
+        )
+      ) : (
+        <>
+          Would you like to join the sell queue?
+          <Spacer y={1} />
+          When the price of tokens change, HILO will pull from the queue and
+          sell for that player.
+        </>
+      )}
     </Text>
   );
 

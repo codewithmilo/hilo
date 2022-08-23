@@ -119,15 +119,9 @@ export default function Home() {
     if (!provider) return;
 
     updateGameState()
-      .then((state: GameState) => {
-        setupGameEvents(provider, account, updateGameState, showPriceUpdate);
-
-        if (state.winners.length > 0) {
-          setPageState(PageState.OVER);
-        } else {
-          setPageState(PageState.READY);
-        }
-      })
+      .then((state: GameState) =>
+        setupGameEvents(provider, account, updateGameState, showPriceUpdate)
+      )
       .catch((error: SolidityError) => {
         console.log(error);
         setWalletError(getWalletError(error));
@@ -151,7 +145,6 @@ export default function Home() {
         const network = await library.getNetwork();
 
         setWallet(instance);
-        console.log(accounts);
         if (accounts) setAccount(accounts[0]);
 
         if (network.chainId !== CONSTANTS.CHAIN_ID) {
@@ -167,8 +160,13 @@ export default function Home() {
 
   const updateGameState = async () => {
     const state = await getGameState(provider, account);
+    console.log(state);
     setGameState(state);
-    setPageState(PageState.READY);
+    if (state.winners.length > 0) {
+      setPageState(PageState.OVER);
+    } else {
+      setPageState(PageState.READY);
+    }
     return state;
   };
 
@@ -185,6 +183,7 @@ export default function Home() {
   useEffect(() => {
     if (modalVisible === null) {
       updateGameState();
+      document.body.style.overflow = "visible";
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalVisible]);

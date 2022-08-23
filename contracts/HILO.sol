@@ -25,7 +25,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     // number of buys per price level
     uint256 public buyRequiredCount;
 
-    // number of buys that push price changes (double buyRequiredCount)
+    // number of buys that push price changes
     uint256 public buyForceCount;
 
     // number of buys until sales are open
@@ -81,6 +81,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     event PricesConverged(address[] winners, uint256 price);
     event JackpotPaid(address player, uint256 amount);
     event PriceUpdated(address player, uint256 tokenId);
+    event AddedToQueue(address player, uint256 tokenId, uint256 position);
 
     constructor(
         uint256 _initialHi,
@@ -256,9 +257,10 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         // -- but make sure we haven't converged
         bool firstBuy = (price == initialLo && tokenId == LO) ||
             (price == initialHi && tokenId == HI);
-        bool forceUpdate = buyForceCounts[tokenId] == buyForceCount;
+        bool forceUpdate = buyForceCounts[tokenId] == buyForceCount ||
+            amount == 3;
 
-        if (hiPrice != loPrice && (firstBuy || forceUpdate || amount == 3)) {
+        if (hiPrice != loPrice && (firstBuy || forceUpdate)) {
             updatePrice(tokenId);
             emit PriceUpdated(msg.sender, tokenId);
         }
@@ -281,15 +283,20 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
             updateBuyCounts(tokenId);
         }
 
-        // if we've hit the buy threshold, kick off any sales in the queue
-        if (buyCounts[tokenId] == buyRequiredCount) sellFromQueue(tokenId);
+        // if we've updated the price, kick off any sales in the queue
+        if (forceUpdate && hiPrice != loPrice) sellFromQueue(tokenId);
 
         // update the players count
         updatePlayers(msg.sender);
     }
 
     function canSell(uint256 tokenId) public view returns (bool) {
-        return buyCounts[tokenId] == buyRequiredCount;
+        // can sell if we hit the required buy count or we are convergent
+        return buyCounts[tokenId] == buyRequiredCount || hiPrice == loPrice;
+    }
+
+    function firstInQueue() public view returns (address, address) {
+        return (saleQueue[0][0], saleQueue[1][0]);
     }
 
     function checkInQueue(uint256 tokenId) public view returns (uint256) {
@@ -318,7 +325,10 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
 
         // return how many in line
         uint256 index = tokenId == HI ? hiSaleQueueIndex : loSaleQueueIndex;
-        return saleQueue[tokenId].length - index;
+        position = saleQueue[tokenId].length - index;
+        emit AddedToQueue(msg.sender, tokenId, position);
+
+        return position;
     }
 
     function sellFromQueue(uint256 tokenId) private whenNotPaused {
@@ -347,8 +357,7 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     }
 
     function sell(uint256 tokenId) public nonReentrant {
-        // this is because we want to sell from the queue sometimes.
-        // TBD if this will actually work, since we aren't signing the transaction
+        // this is because we want to sell from the queue sometimes
         address player = msg.sender;
         _sell(player, tokenId);
 
@@ -360,9 +369,12 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         // check if the token is valid
         require(tokenId == HI || tokenId == LO, "Invalid token.");
 
-        // check the lock is open
+        // check the lock is open or we are convergent
         bool isUnlocked = buyCounts[tokenId] == buyRequiredCount;
-        require(isUnlocked, "HILO: cannot sell when the sale is locked");
+        require(
+            isUnlocked && hiPrice != loPrice,
+            "HILO: cannot sell when the sale is locked"
+        );
 
         // add the action
         addAction(player, tokenId);

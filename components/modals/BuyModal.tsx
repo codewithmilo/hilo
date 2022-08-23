@@ -75,6 +75,7 @@ export default function BuyModal(props: BuyModalProps) {
     token === Tokens.HI ? "/img/hiToken.png" : "/img/loToken.png";
   const tokenPrice =
     token === Tokens.HI ? gameState.currentHi : gameState.currentLo;
+  const pricesConverged = gameState.currentHi === gameState.currentLo;
 
   return (
     <Modal
@@ -127,10 +128,13 @@ export default function BuyModal(props: BuyModalProps) {
             <Text css={{ textAlign: "center" }}>
               Three tokens for {tokenPrice * 3} USDC
               <br />
-              The price will {token === Tokens.HI
-                ? "decrease "
-                : "increase "}{" "}
-              after this purchase
+              {!pricesConverged && (
+                <>
+                  The price will{" "}
+                  {token === Tokens.HI ? "decrease " : "increase "} after this
+                  purchase
+                </>
+              )}
             </Text>
           </Card.Body>
         </Card>

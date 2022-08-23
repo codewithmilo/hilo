@@ -13,7 +13,12 @@ export default function PriceUpdate(props: PriceUpdateProps) {
   const changeStr = token === CONSTANTS.HI_TOKEN_ID ? "decreased" : "increased";
 
   return (
-    <Card variant="bordered" isPressable onPress={closeFn}>
+    <Card
+      variant="bordered"
+      isPressable
+      onPress={closeFn}
+      css={{ margin: "0 auto", maxWidth: "600px" }}
+    >
       <Card.Body>
         <Text b color="white" size="1.2rem" css={{ textAlign: "center" }}>
           The {tokenString(token)} token price has {changeStr}!

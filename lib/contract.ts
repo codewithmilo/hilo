@@ -1,11 +1,9 @@
 import { BigNumber, Contract, providers, utils } from "ethers";
-import { Dispatch, SetStateAction } from "react";
 import abi from "../src/HILO.json";
 import { CONSTANTS } from "./constants";
 import {
   GameState,
   SolidityError,
-  SolidityErrorHandler,
   SolidityTxn,
   SolidityTxnReceipt,
   Tokens,
@@ -21,7 +19,7 @@ type HiloGameState = {
 };
 
 const maybeHandleTxnReplaced = (err: SolidityError): SolidityTxn | void => {
-  console.log(err);
+  console.log("txn replaced", err);
   const errCode = err.code;
   console.log(errCode);
   console.log(err.replacement);
@@ -60,102 +58,6 @@ export const getGameState = async (
     .catch((err: SolidityError) => err);
 };
 
-const getPrice = async (
-  tokenId: Tokens,
-  provider: providers.Web3Provider
-): Promise<number | SolidityError> => {
-  const HILOContract = new Contract(
-    CONSTANTS.HILO_CONTRACT_ADDRESS,
-    abi.abi,
-    provider
-  );
-
-  return HILOContract.getPrice(tokenId)
-    .then((_price: BigNumber) => {
-      const price = _price.toNumber();
-      console.log("Got price for tokenID %s: %s", tokenId, price);
-      return price;
-    })
-    .catch((err: SolidityError) => {
-      console.log(err);
-      return err;
-    });
-};
-
-const getBalance = async (
-  tokenId: Tokens,
-  provider: providers.Web3Provider,
-  handleErrors: SolidityErrorHandler
-): Promise<number> => {
-  const signer = provider.getSigner();
-  const address = await signer.getAddress();
-
-  const HILOContract = new Contract(
-    CONSTANTS.HILO_CONTRACT_ADDRESS,
-    abi.abi,
-    signer
-  );
-
-  return HILOContract.balanceOf(address, tokenId)
-    .then((_balance: BigNumber) => {
-      const balance = _balance.toNumber();
-      console.log("Got balance for tokenID %s: %s", tokenId, balance);
-      return balance;
-    })
-    .catch((err: SolidityError) => handleErrors(err));
-};
-
-const getPlayerTotals = async (provider: providers.Web3Provider) => {
-  const HILOContract = new Contract(
-    CONSTANTS.HILO_CONTRACT_ADDRESS,
-    abi.abi,
-    provider
-  );
-  let total = {
-    hi: null,
-    lo: null,
-    registered: null,
-  };
-
-  return await HILOContract.totalSupply(CONSTANTS.HI_TOKEN_ID).then(
-    (supply) => {
-      console.log("HI supply:", supply.toNumber());
-      total.hi = supply.toNumber();
-
-      return HILOContract.totalSupply(CONSTANTS.LO_TOKEN_ID)
-        .then((supply) => {
-          console.log("LO supply:", supply.toNumber());
-          total.lo = supply.toNumber();
-          total.registered = total.hi + total.lo;
-          return total;
-        })
-        .catch((err) => {
-          console.log(err);
-          return null;
-        });
-    }
-  );
-};
-
-const getWinners = async (provider, handleErrors) => {
-  const HILOContract = new Contract(
-    CONSTANTS.HILO_CONTRACT_ADDRESS,
-    abi.abi,
-    provider
-  );
-
-  return await HILOContract.gameWon()
-    .then((gameWon) => {
-      console.log("gameWon:", gameWon);
-      if (gameWon) {
-        return HILOContract.getWinners();
-      } else {
-        return [];
-      }
-    })
-    .catch((err) => handleErrors(err));
-};
-
 export const checkCanSell = async (
   provider: providers.Web3Provider,
   tokenId: Tokens
@@ -186,7 +88,7 @@ export const checkQueuePosition = async (
 
   return HILOContract.checkInQueue(tokenId)
     .then((position: BigNumber) => {
-      console.log("position:", position.toNumber());
+      console.log("position:", position.toNumber(), tokenId);
       return position.toNumber();
     })
     .catch((err: SolidityError) => err);
@@ -202,8 +104,12 @@ export const joinSellQueue = async (
     abi.abi,
     signer
   );
-  return await HILOContract.addToQueue(tokenId)
+  return HILOContract.addToQueue(tokenId)
     .then((txn: SolidityTxn) => provider.waitForTransaction(txn.hash))
+    .then((receipt: SolidityTxnReceipt) => {
+      console.log("Joined queue", receipt);
+      return HILOContract.checkInQueue(tokenId);
+    })
     .then((position: BigNumber) => position.toNumber())
     .catch((err: SolidityError) => err);
 };
@@ -255,26 +161,6 @@ export const sell = async (
     });
 };
 
-const checkApproval = async (
-  provider: providers.Web3Provider,
-  amount: number
-): Promise<boolean> => {
-  const signer = provider.getSigner();
-  const address = await signer.getAddress();
-  const usdcABI = [
-    "function allowance(address owner, address spender) external view returns (uint256)",
-  ];
-  const USDCContract = new Contract(CONSTANTS.USDC_ADDRESS, usdcABI, signer);
-
-  return USDCContract.allowance(address, CONSTANTS.HILO_CONTRACT_ADDRESS).then(
-    (_allowance: BigNumber) => {
-      const allowance = parseInt(utils.formatEther(_allowance));
-      console.log("Allowance is", allowance);
-      return allowance >= amount;
-    }
-  );
-};
-
 export const approvePayments = async (
   _amount: number,
   provider: providers.Web3Provider
@@ -306,7 +192,7 @@ export const setupGameEvents = (
   provider: providers.Web3Provider,
   account: string,
   updateFn: () => Promise<any>,
-  bannerUpdate: (token: Tokens) => void
+  priceUpdate: (token: Tokens) => void
 ) => {
   const HILOContract = new Contract(
     CONSTANTS.HILO_CONTRACT_ADDRESS,
@@ -319,8 +205,7 @@ export const setupGameEvents = (
   HILOContract.on(filter, (player: string, _tokenId: BigNumber, event: any) => {
     const tokenId = _tokenId.toNumber() as Tokens;
     console.log("PriceUpdated:", player, tokenId, event);
-    if (player === account) return;
-    bannerUpdate(tokenId);
+    priceUpdate(tokenId);
     updateFn();
   });
 
