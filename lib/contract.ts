@@ -85,8 +85,9 @@ export const checkQueuePosition = async (
     abi.abi,
     provider
   );
+  const address = await provider.getSigner().getAddress();
 
-  return HILOContract.checkInQueue(tokenId)
+  return HILOContract.checkInQueue(tokenId, address)
     .then((position: BigNumber) => {
       console.log("position:", position.toNumber(), tokenId);
       return position.toNumber();
@@ -104,11 +105,13 @@ export const joinSellQueue = async (
     abi.abi,
     signer
   );
+  const address = await signer.getAddress();
+
   return HILOContract.addToQueue(tokenId)
     .then((txn: SolidityTxn) => provider.waitForTransaction(txn.hash))
     .then((receipt: SolidityTxnReceipt) => {
       console.log("Joined queue", receipt);
-      return HILOContract.checkInQueue(tokenId);
+      return HILOContract.checkInQueue(tokenId, address);
     })
     .then((position: BigNumber) => position.toNumber())
     .catch((err: SolidityError) => err);

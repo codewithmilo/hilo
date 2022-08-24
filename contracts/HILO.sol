@@ -37,7 +37,8 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
     mapping(uint256 => uint256) public buyForceCounts;
 
     // queue for sales
-    mapping(uint256 => address[]) public saleQueue;
+    address[] public hiSaleQueue;
+    address[] public loSaleQueue;
     uint256 public hiSaleQueueIndex = 0;
     uint256 public loSaleQueueIndex = 0;
 
@@ -295,19 +296,19 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
         return buyCounts[tokenId] == buyRequiredCount || hiPrice == loPrice;
     }
 
-    function firstInQueue() public view returns (address, address) {
-        return (saleQueue[0][0], saleQueue[1][0]);
-    }
-
-    function checkInQueue(uint256 tokenId) public view returns (uint256) {
+    function checkInQueue(uint256 tokenId, address player)
+        public
+        view
+        returns (uint256)
+    {
         // This one lets the saleQueue grow forever, and we keep looping through it,
         // though we do only go through the active queue. The bet is that there will
         // never be enough players for this to be an issue...famous last words
         uint256 position = 1;
-        address[] memory queue = saleQueue[tokenId];
+        address[] memory queue = tokenId == HI ? hiSaleQueue : loSaleQueue;
         uint256 index = tokenId == HI ? hiSaleQueueIndex : loSaleQueueIndex;
         for (uint256 i = index; i < queue.length; i++) {
-            if (queue[i] == msg.sender) {
+            if (queue[i] == player) {
                 return position;
             }
             position = position + 1;
@@ -317,15 +318,16 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
 
     function addToQueue(uint256 tokenId) public returns (uint256) {
         // check we aren't already in it
-        uint256 position = checkInQueue(tokenId);
+        uint256 position = checkInQueue(tokenId, msg.sender);
         if (position > 0) return position;
 
         // add to queue
-        saleQueue[tokenId].push(msg.sender);
+        address[] storage queue = tokenId == HI ? hiSaleQueue : loSaleQueue;
+        queue.push(msg.sender);
 
         // return how many in line
         uint256 index = tokenId == HI ? hiSaleQueueIndex : loSaleQueueIndex;
-        position = saleQueue[tokenId].length - index;
+        position = queue.length - index;
         emit AddedToQueue(msg.sender, tokenId, position);
 
         return position;
@@ -333,13 +335,14 @@ contract HILO is ERC1155Supply, Ownable, Pausable, ReentrancyGuard {
 
     function sellFromQueue(uint256 tokenId) private whenNotPaused {
         // nothing to do if nothing in the queue!
-        if (saleQueue[tokenId].length == 0) return;
+        address[] memory queue = tokenId == HI ? hiSaleQueue : loSaleQueue;
+        if (queue.length == 0) return;
 
         // get the next player waiting in the sell queue
         // since we can't pop from the dynamic array, we just increase the index here
         // and the next address, whether already in line or added, will be there
         uint256 index = tokenId == HI ? hiSaleQueueIndex : loSaleQueueIndex;
-        address player = saleQueue[tokenId][index];
+        address player = queue[index];
 
         // make sure they still have the one they planned to sell
         uint256 tokenBalance = balanceOf(player, tokenId);

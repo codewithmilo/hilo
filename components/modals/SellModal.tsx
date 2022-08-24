@@ -26,7 +26,7 @@ export default function SellModal(props: SellModalProps) {
   const [pending, setPending] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [canSell, setCanSell] = useState<boolean>(false);
+  const [canSell, setCanSell] = useState<boolean | null>(null);
   const [queuePosition, setQueuePosition] = useState<number>(0);
 
   const { closeFn, provider, token, gameState } = props;
@@ -72,18 +72,24 @@ export default function SellModal(props: SellModalProps) {
     token === Tokens.HI ? gameState.currentHi : gameState.currentLo;
   const tokenBalance = gameState.tokenBalances[token];
 
+  const fetchData = async () => {
+    return [
+      await checkCanSell(provider, token),
+      await checkQueuePosition(provider, token),
+    ];
+  };
+
+  const isInQueue = () => !canSell && queuePosition > 0;
+
   // check if we can sell/queue position on render
   useEffect(() => {
-    let _canSell: boolean, _queuePosition: number;
-    (async () => {
-      // You can await here
-      _canSell = await checkCanSell(provider, token);
-      _queuePosition = await checkQueuePosition(provider, token);
-    })();
+    fetchData().then((res) => {
+      setCanSell(res[0]);
+      setQueuePosition(res[1]);
+    });
 
-    setCanSell(_canSell);
-    setQueuePosition(_queuePosition);
-  }, [provider, token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const SellDescription = (
     <Text size="1.3rem">
@@ -116,6 +122,8 @@ export default function SellModal(props: SellModalProps) {
     </Text>
   );
 
+  if (canSell === null) return null;
+
   return (
     <Modal
       blur
@@ -146,9 +154,9 @@ export default function SellModal(props: SellModalProps) {
           )}
         </Grid>
         <Button auto flat color="error" onClick={closeFn} disabled={pending}>
-          <Text h4>{success ? "Close" : "Cancel"}</Text>
+          <Text h4>{success || isInQueue() ? "Close" : "Cancel"}</Text>
         </Button>
-        {!success && (
+        {!success && !isInQueue() && (
           <Button auto onPress={sellOrJoinQueue} disabled={pending}>
             {pending ? (
               <Loading size="sm" />

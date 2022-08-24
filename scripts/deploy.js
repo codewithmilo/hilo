@@ -4,7 +4,7 @@ async function main() {
   const hiPrice = 5;
   const loPrice = 1;
   const buyCount = 2;
-  const jackpot = 15;
+  const jackpot = 5;
 
   // We get the contract to deploy
   const HILO = await hre.ethers.getContractFactory("HILO");
