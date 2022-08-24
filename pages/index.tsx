@@ -89,7 +89,8 @@ export default function Home() {
     if (!wallet) return;
 
     // HANDLE WALLET CHANGES
-    const handleAccountsChanged = (accounts) => {
+    // Annoyingly, this doesn't fire if the account changed to is not connected yet
+    const handleAccountsChanged = (accounts: string[]) => {
       console.log("accountsChanged", accounts);
       if (!accounts.length) {
         // this is effectively a disconnect
@@ -105,6 +106,7 @@ export default function Home() {
 
     wallet.on("accountsChanged", handleAccountsChanged);
     wallet.on("chainChanged", handleChainChanged);
+    wallet.on("disconnect", () => window.location.reload());
 
     return () => {
       if (wallet.removeListener) {
@@ -119,7 +121,7 @@ export default function Home() {
     if (!provider) return;
 
     updateGameState()
-      .then((state: GameState) =>
+      .then(() =>
         setupGameEvents(provider, account, updateGameState, showPriceUpdate)
       )
       .catch((error: SolidityError) => {
@@ -142,6 +144,7 @@ export default function Home() {
       .then(async (instance: any) => {
         const library = new providers.Web3Provider(instance);
         const accounts = await library.listAccounts();
+        console.log(accounts);
         const network = await library.getNetwork();
 
         setWallet(instance);
