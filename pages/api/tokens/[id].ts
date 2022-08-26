@@ -1,8 +1,10 @@
+import { NextApiRequest, NextApiResponse } from "next";
+
 // /api/tokens/{id}
-export default function handler(req, res) {
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
-  const tid = parseInt(id);
-  let metadata;
+  const tid = parseInt(id as string);
+  let metadata: { name: string; description: string; image: string };
 
   switch (tid) {
     case 0:
@@ -23,7 +25,7 @@ export default function handler(req, res) {
       break;
 
     default:
-      metadata = {};
+      metadata = { name: "", description: "", image: "" };
       break;
   }
 
