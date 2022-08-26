@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 
@@ -125,7 +125,6 @@ export default function Home() {
         setupGameEvents(provider, account, updateGameState, showPriceUpdate)
       )
       .catch((error: SolidityError) => {
-        console.log(error);
         setWalletError(getWalletError(error));
       });
 
@@ -144,7 +143,6 @@ export default function Home() {
       .then(async (instance: any) => {
         const library = new providers.Web3Provider(instance);
         const accounts = await library.listAccounts();
-        console.log(accounts);
         const network = await library.getNetwork();
 
         setWallet(instance);
@@ -163,7 +161,6 @@ export default function Home() {
 
   const updateGameState = async () => {
     const state = await getGameState(provider, account);
-    console.log(state);
     setGameState(state);
     if (state.winners.length > 0) {
       setPageState(PageState.OVER);
@@ -203,6 +200,9 @@ export default function Home() {
       <Head>
         <title>HILO</title>
         <link rel="icon" href="/img/hilo.png" />
+        <meta property="og:url" content="https://www.hilogame.xyz" />
+        <meta property="og:title" content="HILO" />
+        <meta property="og:description" content="A Game of Tokens" />
       </Head>
       <Container fluid css={{ minHeight: "100vh", position: "relative" }}>
         <Text h1 size="8rem" className={styles.title}>
