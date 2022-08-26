@@ -5,7 +5,7 @@ const errorMap = {
   "execution reverted: ERC20: transfer amount exceeds allowance":
     "It looks like you need to approve sending HILO some USDC. Approve that, and then try again?",
   "execution reverted: ERC20: transfer amount exceeds balance":
-    "It looks like we are short some USDC. Top up and try again?",
+    "It looks like you are short some USDC. Top up and try again?",
   "execution reverted: HILO: cannot sell when the sale is locked":
     "sales locked",
   "execution reverted: Insufficient USDC balance.":
